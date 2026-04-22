@@ -9,7 +9,6 @@
   document.getElementById('reg-form').onsubmit = e => {
     e.preventDefault();
     const info = { fullName: document.getElementById('fullName').value, email: document.getElementById('email').value, phone: document.getElementById('phone').value, position: document.getElementById('position').value };
-    document.getElementById('loading').innerHTML = '<div class="spinner"></div><p>Đang chuẩn bị bài thi...</p>';
     document.getElementById('loading').style.display = 'block';
     google.script.run.withSuccessHandler(data => {
       testData = data; renderTest(); startTimer(data.duration);
@@ -27,20 +26,20 @@
     testData.questions.forEach((q, i) => {
       if (q.category && q.category !== currentCategory) {
         currentCategory = q.category;
-        cont.innerHTML += `<div class="section-title fade-in-up" style="animation-delay: ${i * 0.05}s">Phần: ${currentCategory}</div>`;
+        cont.innerHTML += `<h3 style="margin-top: 30px; border-bottom: 2px solid #3498db; padding-bottom: 5px; color: #2c3e50;">Phần: ${currentCategory}</h3>`;
       }
 
       const requiredMarker = (q.required === true || q.required === "TRUE" || q.required === "true") ? `<span style="color:red;">*</span>` : "";
       let h = `<div class="question-block" data-id="${q.id}" data-type="${q.type}" data-text="${q.question}" data-required="${q.required}">`;
       h += `<b>${q.question}</b> ${requiredMarker}<br>`;
-      
+
       if (q.desc) {
         h += `<p class="question-desc">${q.desc}</p>`;
       }
       if (q.image) {
         h += `<img src="${q.image}" class="question-image" style="max-width:100%;"><br>`;
       }
-      
+
       if(q.type === 'MULTIPLE_CHOICE' || q.type === 'SCALE') {
         q.options.forEach(o => h += `<label class="option-label"><input type="radio" name="q${i}" value="${o}"> ${o}</label>`);
       } else if(q.type === 'CHECKBOX') {
@@ -53,22 +52,6 @@
         h += `</select>`;
       }
       cont.innerHTML += h + `</div>`;
-    });
-
-    // Add event listeners for dynamic styling
-    document.querySelectorAll('.option-label input').forEach(input => {
-      input.addEventListener('change', function() {
-        if (this.type === 'radio') {
-          const name = this.name;
-          document.querySelectorAll(`input[name="${name}"]`).forEach(radio => {
-            radio.closest('.option-label').classList.remove('selected');
-          });
-          this.closest('.option-label').classList.add('selected');
-        } else if (this.type === 'checkbox') {
-          if (this.checked) this.closest('.option-label').classList.add('selected');
-          else this.closest('.option-label').classList.remove('selected');
-        }
-      });
     });
   }
 
@@ -89,7 +72,7 @@
       let ans = "";
       if (type === 'MULTIPLE_CHOICE' || type === 'SCALE') ans = (b.querySelector('input:checked') || {}).value || "";
       else if (type === 'CHECKBOX') ans = Array.from(b.querySelectorAll('input:checked')).map(i => i.value).join(', ');
-      else if (type === 'PARAGRAPH') ans = b.querySelector('textarea').value;
+      else if (type === 'PARAGRAPH') ans = b.querySelector('textarea').value.trim();
       else if (type === 'DROPDOWN') ans = b.querySelector('select').value;
       return { id: b.dataset.id, question: b.dataset.text, answer: ans };
     });
@@ -114,7 +97,7 @@
         else if (type === 'CHECKBOX') ans = Array.from(b.querySelectorAll('input:checked')).map(i => i.value).join(', ');
         else if (type === 'PARAGRAPH') ans = b.querySelector('textarea').value.trim();
         else if (type === 'DROPDOWN') ans = b.querySelector('select').value;
-        
+
         if (!ans) {
           b.style.border = "2px solid red";
           allValid = false;

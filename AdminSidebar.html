@@ -2,140 +2,98 @@
 <html>
 <head>
   <base target="_top">
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --primary: #4F46E5;
-      --primary-hover: #4338CA;
-      --bg: #F9FAFB;
-      --surface: #FFFFFF;
-      --text: #111827;
-      --text-muted: #6B7280;
-      --border: #E5E7EB;
-      --radius: 12px;
-      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    }
-    body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); padding: 20px; font-size: 14px; margin: 0; }
-    h2 { font-size: 18px; color: var(--text); font-weight: 700; margin-top: 0; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;}
-    h2::before { content: ''; display: inline-block; width: 4px; height: 18px; background: var(--primary); border-radius: 4px; }
-    
-    .tab { display: flex; gap: 8px; background: #E5E7EB; padding: 6px; border-radius: 14px; margin-bottom: 24px; }
-    .tab button { 
-      flex: 1; background: transparent; border: none; padding: 12px; border-radius: 10px; 
-      cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; color: var(--text-muted); 
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); font-size: 14px;
-    }
-    .tab button:hover { color: var(--text); background: rgba(255,255,255,0.3); }
-    .tab button.active { background: var(--surface); color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    
-    .tabcontent { display: none; animation: fadeIn 0.4s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    
-    input[type="email"], input[type="number"], input[type="text"] { 
-      width: 100%; padding: 14px 16px; margin: 8px 0 20px; border: 1.5px solid var(--border); 
-      border-radius: 12px; box-sizing: border-box; font-family: 'Outfit', sans-serif; outline: none; transition: 0.3s;
-      background: var(--surface);
-    }
-    input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15); }
-    
-    button.action-btn { 
-      background: var(--primary); color: white; padding: 14px; border: none; 
-      border-radius: 12px; cursor: pointer; width: 100%; font-weight: 600; font-family: 'Outfit', sans-serif; 
-      transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25); font-size: 15px;
-    }
-    button.action-btn:hover { background: var(--primary-hover); transform: translateY(-2px); box-shadow: 0 6px 16px rgba(79, 70, 229, 0.3); }
-    button.action-btn:active { transform: translateY(0); }
-    
-    .card { background: var(--surface); padding: 20px; border-radius: 16px; box-shadow: var(--shadow); margin-bottom: 20px; border: 1px solid var(--border); transition: transform 0.2s;}
-    .card:hover { transform: translateY(-2px); border-color: #D1D5DB; }
-    .card h3 { margin-top: 0; font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px; color: var(--text); }
-    
-    #loading { color: var(--primary); font-size: 14px; font-weight: 500; display: none; text-align: center; margin: 15px 0; }
-    
-    .disc-box { padding: 16px; background: rgba(79, 70, 229, 0.04); border-left: 4px solid var(--primary); border-radius: 0 12px 12px 0; }
-    .disc-box h4 { margin: 0 0 10px 0; color: var(--primary); font-size: 18px; font-weight: 700; }
-    .disc-box p { margin: 0; font-size: 13.5px; color: var(--text-muted); line-height: 1.6; }
-    
-    .stat-row { display: flex; justify-content: space-between; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed var(--border); }
-    .stat-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-    .stat-label { color: var(--text-muted); font-weight: 500;}
-    .stat-value { font-weight: 700; color: var(--text); font-size: 15px;}
-    
-    .para-item { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px dashed var(--border); }
-    .para-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-    .para-question { font-weight: 600; margin-bottom: 10px; color: var(--text); line-height: 1.5; }
-    .para-answer { background: var(--bg); padding: 12px 16px; border-radius: 10px; font-size: 14px; line-height: 1.6; color: var(--text-muted); border: 1px solid var(--border); margin-bottom: 12px; }
-    .para-score-row { display: flex; gap: 12px; align-items: center; }
-    .para-score-row input { margin: 0; padding: 10px 12px; width: 80px; text-align: center; font-weight: 600; }
-    .para-score-row button { width: auto; padding: 10px 16px; background: var(--secondary); box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2); }
-    .para-score-row button:hover { background: #059669; box-shadow: 0 6px 14px rgba(16, 185, 129, 0.3); }
-    
-    .spinner { width: 30px; height: 30px; border: 3px solid rgba(79, 70, 229, 0.2); border-left-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 10px auto; }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    body { font-family: Arial, sans-serif; padding: 10px; font-size: 14px; }
+    h2 { font-size: 16px; color: #34495e; border-bottom: 2px solid #3498db; padding-bottom: 5px; }
+    .tab { overflow: hidden; border-bottom: 1px solid #ccc; background-color: #f1f1f1; margin-bottom: 15px; display: flex; flex-wrap: wrap;}
+    .tab button { background-color: inherit; float: left; border: none; outline: none; cursor: pointer; padding: 10px 16px; transition: 0.3s; font-size: 14px; }
+    .tab button:hover { background-color: #ddd; }
+    .tab button.active { background-color: #ccc; font-weight: bold; }
+    .tabcontent { display: none; padding: 0; border-top: none; }
+    input[type="email"], input[type="number"], input[type="text"], select, textarea { width: 100%; padding: 8px; margin: 8px 0; display: inline-block; border: 1px solid #ccc; box-sizing: border-box; border-radius: 4px; }
+    button.action-btn { background-color: #3498db; color: white; padding: 10px; border: none; border-radius: 4px; cursor: pointer; width: 100%; }
+    button.action-btn:hover { background-color: #2980b9; }
+    .card { background: #fff; padding: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); margin-bottom: 15px; border: 1px solid #eee; }
+    #loading, #loadingAssign { color: #f39c12; font-style: italic; display: none; margin-top: 10px;}
+    .disc-box { padding: 10px; background: #e8f4f8; border-left: 4px solid #3498db; margin-top: 10px; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
   <div class="tab">
-    <button class="tablinks active" onclick="openTab(event, 'General')">Hệ thống</button>
-    <button class="tablinks" onclick="openTab(event, 'Report')">Tra cứu</button>
+    <button class="tablinks active" onclick="openTab(event, 'General')">Chung</button>
+    <button class="tablinks" onclick="openTab(event, 'Configs')">Cấu hình</button>
+    <button class="tablinks" onclick="openTab(event, 'Assignments')">Chỉ định</button>
+    <button class="tablinks" onclick="openTab(event, 'Report')">Báo cáo</button>
   </div>
 
   <div id="General" class="tabcontent" style="display:block;">
     <h2>Thông tin hệ thống</h2>
-    <p style="color: var(--text-muted); line-height: 1.6; margin-bottom: 20px;">Chia sẻ liên kết này để ứng viên bắt đầu làm bài test. Link được bảo mật và tự động hóa toàn bộ quy trình.</p>
-    <button class="action-btn" onclick="copyLink()">
-      <span style="display: flex; align-items: center; justify-content: center; gap: 8px;">
-        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
-        Copy Link Bài Test
-      </span>
-    </button>
+    <p>Sử dụng nút bên dưới để copy link gửi cho ứng viên.</p>
+    <button class="action-btn" onclick="copyLink()">Copy Link Bài Test</button>
+  </div>
+
+  <div id="Configs" class="tabcontent">
+    <h2>Cấu hình Số lượng Câu hỏi</h2>
+    <p style="font-size: 12px; color: #555;">Tải và chỉnh sửa cấu hình lưới độ khó hiện tại trong sheet CONFIG. Nhập số câu hỏi tương ứng cho mỗi vị trí.</p>
+    <button class="action-btn" onclick="fetchConfigs()" style="background:#e67e22; margin-bottom: 10px;">Tải dữ liệu Config</button>
+    <div id="loadingConfig" style="color: #f39c12; font-style: italic; display: none;">Đang tải...</div>
+
+    <div id="configContainer" style="display:none; overflow-x:auto;">
+      <table id="configTable" style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 10px;">
+        <thead id="configThead" style="background:#ecf0f1; border-bottom:2px solid #bdc3c7; text-align: left;"></thead>
+        <tbody id="configTbody"></tbody>
+      </table>
+      <button class="action-btn" onclick="saveConfigs()">Lưu thay đổi Config</button>
+    </div>
+  </div>
+
+  <div id="Assignments" class="tabcontent">
+    <h2>Chỉ định câu hỏi (Advance)</h2>
+    <p style="font-size: 12px; color: #555;">Dán các ID câu hỏi cách nhau bởi dấu cách. Nếu ứng viên này làm bài, hệ thống sẽ bỏ qua Config ngẫu nhiên và dùng đúng các câu hỏi này.</p>
+    <label>Email ứng viên:</label>
+    <input type="email" id="assignEmail" placeholder="vd: ungvien@mail.com">
+    <label>Vị trí ứng tuyển:</label>
+    <select id="assignPosition">
+      <option value="Staff">Staff</option>
+      <option value="Manager">Manager</option>
+      <option value="Senior">Senior</option>
+    </select>
+    <label>Danh sách ID (cách nhau bởi dấu cách):</label>
+    <textarea id="assignIds" rows="5" placeholder="vd: IQ001 IQ002 PS001 PER001"></textarea>
+    <button class="action-btn" onclick="assignQuestions()">Lưu Chỉ Định</button>
+    <div id="loadingAssign">Đang lưu...</div>
   </div>
 
   <div id="Report" class="tabcontent">
     <h2>Tra cứu ứng viên</h2>
-    <input type="email" id="searchEmail" placeholder="Nhập email ứng viên...">
-    <button class="action-btn" onclick="fetchReport()">Phân tích dữ liệu</button>
-    
-    <div id="loading">
-      <div class="spinner"></div>
-      Đang tải dữ liệu...
-    </div>
+    <input type="email" id="searchEmail" placeholder="Nhập email ứng viên">
+    <button class="action-btn" onclick="fetchReport()">Tra cứu</button>
+    <div id="loading">Đang tải...</div>
 
-    <div id="reportContainer" style="display:none; margin-top: 24px;">
+    <div id="reportContainer" style="display:none; margin-top: 20px;">
       <div class="card">
-        <h3>Tổng quan Kết quả</h3>
-        <div class="stat-row">
-          <span class="stat-label">Tổng điểm đạt được</span>
-          <span class="stat-value" id="rTotal" style="color: var(--primary); font-size: 18px;"></span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-label">Thời gian hoàn thành</span>
-          <span class="stat-value"><span id="rTime"></span>s</span>
-        </div>
+        <h3>Tổng quan</h3>
+        <p><b>Tổng điểm:</b> <span id="rTotal"></span></p>
+        <p><b>Thời gian:</b> <span id="rTime"></span>s</p>
       </div>
 
       <div class="card">
-        <h3>Phân tích Tính cách (DISC)</h3>
+        <h3>Hồ sơ DISC</h3>
         <div class="disc-box">
-          <h4 id="rDisc"></h4>
-          <p>
-            <b>D</b> - Cạnh tranh, Quyết đoán<br>
-            <b>I</b> - Giao tiếp, Lạc quan<br>
-            <b>S</b> - Kiên định, Ổn định<br>
-            <b>C</b> - Logic, Chuẩn xác
-          </p>
+          <h4 id="rDisc" style="margin-top:0;"></h4>
+          <p style="margin-bottom:0; font-size:12px; color:#555;">D (Dominance) - Cạnh tranh, Quyết đoán<br>I (Influence) - Giao tiếp, Lạc quan<br>S (Steadiness) - Kiên định, Ổn định<br>C (Compliance) - Logic, Chuẩn xác</p>
         </div>
       </div>
 
       <div class="card">
-        <h3>Biểu đồ Năng lực</h3>
+        <h3>Biểu đồ năng lực</h3>
         <canvas id="radarChart"></canvas>
       </div>
 
       <div id="paragraphContainer" class="card">
-        <h3>Đánh giá Tự luận</h3>
+        <h3>Chấm điểm Tự luận</h3>
         <div id="paraList"></div>
       </div>
     </div>
@@ -158,37 +116,106 @@
       evt.currentTarget.className += " active";
     }
 
+    let currentConfigHeaders = [];
+
+    function fetchConfigs() {
+      document.getElementById('loadingConfig').style.display = 'block';
+      document.getElementById('configContainer').style.display = 'none';
+
+      google.script.run.withSuccessHandler(res => {
+        document.getElementById('loadingConfig').style.display = 'none';
+        if(!res || !res.headers || res.headers.length === 0) {
+          alert('Không có dữ liệu Config.');
+          return;
+        }
+
+        currentConfigHeaders = res.headers;
+        document.getElementById('configContainer').style.display = 'block';
+
+        let thead = '<tr>';
+        res.headers.forEach(h => {
+          thead += `<th style="padding: 8px; border: 1px solid #ccc;">${h}</th>`;
+        });
+        thead += '</tr>';
+        document.getElementById('configThead').innerHTML = thead;
+
+        let tbody = '';
+        res.data.forEach((row, rIdx) => {
+          tbody += '<tr>';
+          row.forEach((cell, cIdx) => {
+            if (cIdx === 0) {
+              // Position column (readonly for now or allow text edit)
+              tbody += `<td style="padding: 8px; border: 1px solid #ccc;"><input type="text" id="cfg_${rIdx}_${cIdx}" value="${cell}" style="width:80px; margin:0;"></td>`;
+            } else {
+              tbody += `<td style="padding: 8px; border: 1px solid #ccc;"><input type="number" id="cfg_${rIdx}_${cIdx}" value="${cell}" style="width:60px; margin:0;"></td>`;
+            }
+          });
+          tbody += '</tr>';
+        });
+        document.getElementById('configTbody').innerHTML = tbody;
+      }).getConfigData();
+    }
+
+    function saveConfigs() {
+      const tbody = document.getElementById('configTbody');
+      const rows = tbody.querySelectorAll('tr');
+      let newData = [];
+      newData.push(currentConfigHeaders);
+
+      rows.forEach((tr, rIdx) => {
+        let rowData = [];
+        const inputs = tr.querySelectorAll('input');
+        inputs.forEach((inp, cIdx) => {
+          rowData.push(cIdx === 0 ? inp.value.trim() : (Number(inp.value) || 0));
+        });
+        newData.push(rowData);
+      });
+
+      document.getElementById('loadingConfig').style.display = 'block';
+      document.getElementById('loadingConfig').innerText = 'Đang lưu...';
+
+      google.script.run.withSuccessHandler(msg => {
+        document.getElementById('loadingConfig').style.display = 'none';
+        document.getElementById('loadingConfig').innerText = 'Đang tải...';
+        alert(msg);
+      }).updateConfigData(newData);
+    }
+
     function copyLink() {
-      const btn = document.querySelector('#General button');
-      const originalText = btn.innerHTML;
-      btn.innerHTML = 'Đang lấy link...';
-      
       google.script.run.withSuccessHandler(url => {
         navigator.clipboard.writeText(url).then(() => {
-          btn.innerHTML = 'Đã copy thành công ✓';
-          btn.style.background = 'var(--secondary)';
-          setTimeout(() => {
-            btn.innerHTML = originalText;
-            btn.style.background = 'var(--primary)';
-          }, 2000);
+          alert('Đã copy link: ' + url);
         }).catch(err => {
           prompt("Copy link bên dưới:", url);
-          btn.innerHTML = originalText;
         });
       }).getWebAppUrl();
     }
 
+    function assignQuestions() {
+      const email = document.getElementById('assignEmail').value.trim();
+      const pos = document.getElementById('assignPosition').value;
+      const ids = document.getElementById('assignIds').value.trim();
+
+      if (!email || !ids) return alert("Vui lòng nhập đủ email và danh sách ID.");
+
+      document.getElementById('loadingAssign').style.display = 'block';
+      google.script.run.withSuccessHandler(msg => {
+        document.getElementById('loadingAssign').style.display = 'none';
+        alert(msg);
+      }).assignQuestionsToCandidate(email, pos, ids);
+    }
+
     function fetchReport() {
       const email = document.getElementById('searchEmail').value.trim();
-      if (!email) return alert('Vui lòng nhập email!');
-      
+      if (!email) return alert('Nhập email!');
+
       document.getElementById('loading').style.display = 'block';
       document.getElementById('reportContainer').style.display = 'none';
 
       google.script.run.withSuccessHandler(data => {
         document.getElementById('loading').style.display = 'none';
-        if (!data) return alert('Không tìm thấy dữ liệu cho email này.');
-        
+        if (!data) return alert('Không tìm thấy dữ liệu.');
+
         document.getElementById('reportContainer').style.display = 'block';
         document.getElementById('rTotal').innerText = data.totalScore;
         document.getElementById('rTime').innerText = data.timeTaken;
@@ -206,8 +233,6 @@
 
       if (myRadarChart) myRadarChart.destroy();
 
-      Chart.defaults.font.family = "'Outfit', sans-serif";
-      
       myRadarChart = new Chart(ctx, {
         type: 'radar',
         data: {
@@ -215,24 +240,14 @@
           datasets: [{
             label: 'Điểm số',
             data: dataPoints,
-            backgroundColor: 'rgba(79, 70, 229, 0.2)',
-            borderColor: 'rgba(79, 70, 229, 1)',
-            pointBackgroundColor: 'rgba(79, 70, 229, 1)',
-            pointBorderColor: '#fff',
-            pointHoverBackgroundColor: '#fff',
-            pointHoverBorderColor: 'rgba(79, 70, 229, 1)',
-            borderWidth: 2
+            backgroundColor: 'rgba(52, 152, 219, 0.2)',
+            borderColor: 'rgba(52, 152, 219, 1)',
+            pointBackgroundColor: 'rgba(52, 152, 219, 1)'
           }]
         },
         options: {
           scales: {
-            r: { 
-              beginAtZero: true,
-              ticks: { backdropColor: 'transparent' }
-            }
-          },
-          plugins: {
-            legend: { display: false }
+            r: { beginAtZero: true }
           }
         }
       });
@@ -241,37 +256,33 @@
     function renderParagraphs(paras, email) {
       const list = document.getElementById('paraList');
       list.innerHTML = "";
-      if (!paras || paras.length === 0) {
-        list.innerHTML = "<p style='color: var(--text-muted); font-style: italic;'>Ứng viên không có câu trả lời tự luận.</p>";
+      if (paras.length === 0) {
+        list.innerHTML = "<p>Không có câu tự luận.</p>";
         return;
       }
 
       paras.forEach(p => {
         let div = document.createElement('div');
-        div.className = 'para-item';
-        
+        div.style.marginBottom = "15px";
+        div.style.paddingBottom = "10px";
+        div.style.borderBottom = "1px dashed #ccc";
+
         div.innerHTML = `
-          <div class="para-question">${p.question}</div>
-          <div class="para-answer">${p.answer ? p.answer.replace(/\\n/g, '<br>') : '<i>Không có câu trả lời</i>'}</div>
-          <div class="para-score-row">
-            <input type="number" id="score_${p.id}" value="${p.currentScore}" min="0">
-            <button class="action-btn" onclick="updateScore('${email}', '${p.id}', this)">Cập nhật điểm</button>
+          <strong>${p.question}</strong>
+          <p style="background:#f9f9f9; padding:8px; border-radius:4px; font-size:13px;">${p.answer}</p>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <input type="number" id="score_${p.id}" value="${p.currentScore}" style="width:70px;">
+            <button onclick="updateScore('${email}', '${p.id}')" style="background:#2ecc71; color:white; border:none; padding:8px; border-radius:4px; cursor:pointer;">Lưu điểm</button>
           </div>
         `;
         list.appendChild(div);
       });
     }
 
-    function updateScore(email, qId, btn) {
+    function updateScore(email, qId) {
       const newScore = document.getElementById(`score_${qId}`).value;
-      const originalText = btn.innerText;
-      btn.innerText = "Đang lưu...";
-      btn.style.opacity = "0.7";
-      
       google.script.run.withSuccessHandler(() => {
-        btn.innerText = "Đã lưu ✓";
-        btn.style.opacity = "1";
-        setTimeout(() => { btn.innerText = originalText; }, 2000);
+        alert("Đã cập nhật điểm! Vui lòng tra cứu lại để xem tổng điểm mới.");
       }).updateParagraphScore(email, qId, newScore);
     }
   </script>

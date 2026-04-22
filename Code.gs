@@ -19,6 +19,11 @@ function onOpen() {
     .addToUi();
 }
 
+function showAdminSidebar() {
+  const html = HtmlService.createTemplateFromFile('AdminSidebar').evaluate().setTitle('Admin Panel');
+  SpreadsheetApp.getUi().showSidebar(html);
+}
+
 function showExportPrompt() {
   const html = HtmlService.createHtmlOutputFromFile('ExportModal')
       .setWidth(600)
@@ -26,13 +31,29 @@ function showExportPrompt() {
   SpreadsheetApp.getUi().showModalDialog(html, 'Xuất kết quả bài Test');
 }
 
-function showAdminSidebar() {
-  const html = HtmlService.createTemplateFromFile('AdminSidebar').evaluate().setTitle('Admin Panel');
-  SpreadsheetApp.getUi().showSidebar(html);
-}
-
 function getWebAppUrl() {
   return ScriptApp.getService().getUrl();
+}
+
+function assignQuestionsToCandidate(email, position, idsString) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('ASSIGNMENTS');
+  if (!sheet) return "Lỗi: Không tìm thấy sheet ASSIGNMENTS.";
+
+  // Parse space-separated IDs to comma-separated
+  let ids = idsString.split(/\s+/).map(id => id.trim()).filter(id => id.length > 0).join(',');
+
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === email) {
+      sheet.getRange(i + 1, 2).setValue(position);
+      sheet.getRange(i + 1, 3).setValue(ids);
+      return "Đã cập nhật chỉ định câu hỏi thành công!";
+    }
+  }
+
+  sheet.appendRow([email, position, ids]);
+  return "Đã thêm chỉ định câu hỏi thành công!";
 }
 
 function getCandidateReport(email) {
@@ -105,6 +126,32 @@ function updateParagraphScore(email, qId, newScore) {
   return true;
 }
 
+function getConfigData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let configSheet = ss.getSheetByName('CONFIG');
+  if (!configSheet) return { headers: [], data: [] };
+
+  const values = configSheet.getDataRange().getValues();
+  if (values.length < 1) return { headers: [], data: [] };
+
+  return {
+    headers: values[0],
+    data: values.slice(1)
+  };
+}
+
+function updateConfigData(configArray) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let configSheet = ss.getSheetByName('CONFIG');
+  if (!configSheet) return "Lỗi: Không tìm thấy sheet CONFIG.";
+
+  // configArray is expected to be a 2D array including headers
+  configSheet.clearContents();
+  configSheet.getRange(1, 1, configArray.length, configArray[0].length).setValues(configArray);
+  configSheet.getRange(1, 1, 1, configArray[0].length).setFontWeight('bold');
+  return "Cập nhật Configs thành công!";
+}
+
 function generateExportData(email) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const qbData = ss.getSheetByName('QUESTIONBANK').getDataRange().getValues();
@@ -161,9 +208,9 @@ function initSystem() {
   let configSheet = ss.getSheetByName('CONFIG');
   if (!configSheet) {
     configSheet = ss.insertSheet('CONFIG');
-    const headers = ['Position', 'IQ_1_Count', 'IQ_2_Count', 'IQ_3_Count', 'EQ_1_Count', 'EQ_2_Count', 'EQ_3_Count', 'Problem_Solving_1_Count', 'Problem_Solving_2_Count', 'Problem_Solving_3_Count', 'Leadership_1_Count', 'Leadership_2_Count', 'Leadership_3_Count', 'Personality_1_Count', 'Duration_Minutes'];
+    const headers = ['Position', 'IQ_Count', 'EQ_Count', 'ProblemSolving_Count', 'Leadership_Count', 'Personality_Count', 'Duration_Minutes'];
     configSheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
-    configSheet.appendRow(['Staff', 2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 1, 5, 30]);
+    configSheet.appendRow(['Staff', 5, 5, 5, 5, 5, 30]);
   }
 
   if (!ss.getSheetByName('ANSWERS')) {
@@ -191,10 +238,10 @@ function initSystem() {
 
 function setupValidation(sheet) {
   const rules = {
-    'B': ['Personality', 'IQ', 'EQ', 'Problem_Solving', 'Leadership'],
+    'B': ['Personality', 'IQ', 'EQ', 'ProblemSolving', 'Leadership'],
     'C': ['All', 'Staff', 'Manager', 'Senior'],
     'F': ['Active', 'Inactive', 'Review'],
-    'J': ['MULTIPLE_CHOICE', 'CHECKBOX', 'PARAGRAPH', 'SCALE', 'DROPDOWN'],
+    'J': ['MULTIPLECHOICE', 'CHECKBOX', 'PARAGRAPH', 'SCALE', 'DROPDOWN'],
     'K': ['TRUE', 'FALSE']
   };
   for (let col in rules) {
@@ -206,9 +253,9 @@ function setupValidation(sheet) {
 
 function addSampleQuestions(sheet) {
   const samples = [
-    ['PS001', 'Problem_Solving', 'Manager', 2, 1, 'Active', 'Câu 1: Dự án trễ tiến độ, bạn xử lý thế nào?', '', '', 'MULTIPLE_CHOICE', 'TRUE', 'Báo cáo', 'Đánh giá nội bộ', 'Thuê thêm', 'Báo KH', '', 1, 'Đánh giá nội bộ', 'Đúng!', '', 'Sai!', ''],
-    ['PER001', 'Personality', 'All', 1, 1, 'Active', 'Câu 1: Khi có xung đột nhóm, bạn sẽ?', '', '', 'MULTIPLE_CHOICE', 'TRUE', 'Quyết định ngay', 'Thảo luận', 'Giữ hòa khí', 'Phân tích', '', 0, '', 'D, I, S, C mapping...', '', '', ''],
-    ['IQ001', 'IQ', 'All', 1, 1, 'Active', 'Câu 1: 2, 4, 8, 16... số tiếp theo?', '', '', 'MULTIPLE_CHOICE', 'TRUE', '24', '30', '32', '64', '', 1, '32', 'Đúng!', '', 'Sai!', '']
+    ['PS001', 'ProblemSolving', 'Manager', 2, 1, 'Active', 'Câu 1: Dự án trễ tiến độ, bạn xử lý thế nào?', '', '', 'MULTIPLECHOICE', 'TRUE', 'Báo cáo', 'Đánh giá nội bộ', 'Thuê thêm', 'Báo KH', '', 1, 'Đánh giá nội bộ', 'Đúng!', '', 'Sai!', ''],
+    ['PER001', 'Personality', 'All', 1, 1, 'Active', 'Câu 1: Khi có xung đột nhóm, bạn sẽ?', '', '', 'MULTIPLECHOICE', 'TRUE', 'Quyết định ngay', 'Thảo luận', 'Giữ hòa khí', 'Phân tích', '', 0, '', 'D, I, S, C mapping...', '', '', ''],
+    ['IQ001', 'IQ', 'All', 1, 1, 'Active', 'Câu 1: 2, 4, 8, 16... số tiếp theo?', '', '', 'MULTIPLECHOICE', 'TRUE', '24', '30', '32', '64', '', 1, '32', 'Đúng!', '', 'Sai!', '']
   ];
   sheet.getRange(2, 1, samples.length, samples[0].length).setValues(samples);
 }
