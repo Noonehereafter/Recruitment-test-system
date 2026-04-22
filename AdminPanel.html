@@ -133,10 +133,10 @@
       <p style="color: #555;">Tìm kiếm ứng viên theo Tên, Email, SĐT hoặc Vị trí. Click vào ứng viên để xem báo cáo chi tiết.</p>
 
       <div style="display:flex; gap: 10px; margin-bottom: 20px;">
-        <input type="text" id="reportSearch" placeholder="Tìm kiếm...">
-        <button class="action-btn" style="width: 150px; background: #e67e22;" onclick="loadReportCandidates()">Tải Danh sách</button>
+        <input type="text" id="reportSearch" placeholder="Nhập từ khóa tìm kiếm (tên, email, vị trí)...">
+        <button class="action-btn" style="width: 150px; background: #e67e22;" onclick="loadReportCandidates()">Làm mới</button>
       </div>
-      <div id="loadingReportList" class="loader">Đang tải danh sách...</div>
+      <div id="loadingReportList" class="loader">Đang tải danh sách ứng viên...</div>
 
       <table class="data-table" id="reportCandidatesTable" style="display: none;">
         <thead><tr><th>Ngày thi</th><th>Họ Tên</th><th>Email</th><th>SĐT</th><th>Vị trí</th><th>Hành động</th></tr></thead>
@@ -224,6 +224,7 @@
 
       if (tabName === 'General') loadSettings();
       if (tabName === 'Configs' && currentConfigData.headers.length === 0) fetchAllConfigs();
+      if (tabName === 'Report' && fullReportList.length === 0) loadReportCandidates();
     }
 
     // --- GENERAL TAB ---
@@ -382,6 +383,9 @@
         renderReportCandidatesTable();
         document.getElementById('loadingReportList').style.display = 'none';
         document.getElementById('reportCandidatesTable').style.display = 'table';
+      }).withFailureHandler(err => {
+        document.getElementById('loadingReportList').style.display = 'none';
+        alert('Lỗi tải danh sách: ' + err.message);
       }).getCandidatesList();
     }
 

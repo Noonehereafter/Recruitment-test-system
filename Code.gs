@@ -99,22 +99,33 @@ function saveSystemSettings(settingsObj) {
 }
 
 function getCandidatesList() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const resSheet = ss.getSheetByName('RESULTS');
-  if(!resSheet) return [];
-  const data = resSheet.getDataRange().getValues();
-  let list = [];
-  for(let i=1; i<data.length; i++){
-    list.push({
-      timestamp: data[i][0],
-      fullName: data[i][1],
-      email: data[i][2],
-      phone: data[i][3],
-      position: data[i][4],
-      totalScore: data[i][5]
-    });
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const resSheet = ss.getSheetByName('RESULTS');
+    if(!resSheet) return [];
+
+    const data = resSheet.getDataRange().getValues();
+    if(data.length < 2) return []; // Only headers or empty
+
+    let list = [];
+    for(let i=1; i<data.length; i++){
+      // Skip empty rows
+      if(!data[i][2]) continue;
+
+      list.push({
+        timestamp: data[i][0] ? new Date(data[i][0]).toISOString() : '',
+        fullName: data[i][1] || '',
+        email: data[i][2] || '',
+        phone: data[i][3] || '',
+        position: data[i][4] || '',
+        totalScore: data[i][5] || 0
+      });
+    }
+    // Return sorted by newest first
+    return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  } catch (error) {
+    throw new Error("Lỗi Backend: " + error.message);
   }
-  return list;
 }
 
 function getBulkReports(emails) {
