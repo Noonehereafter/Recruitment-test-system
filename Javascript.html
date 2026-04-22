@@ -21,13 +21,27 @@
   function renderTest() {
     const cont = document.getElementById('questions-container');
     testData.questions.forEach((q, i) => {
-      let h = `<div class="question-block" data-id="${q.id}" data-type="${q.type}" data-text="${q.question}"><b>${q.question}</b>`;
+      const requiredMarker = (q.required === true || q.required === "TRUE" || q.required === "true") ? `<span style="color:red;">*</span>` : "";
+      let h = `<div class="question-block" data-id="${q.id}" data-type="${q.type}" data-text="${q.question}" data-required="${q.required}">`;
+      h += `<b>${q.question}</b> ${requiredMarker}<br>`;
+
+      if (q.desc) {
+        h += `<p class="question-desc">${q.desc}</p>`;
+      }
+      if (q.image) {
+        h += `<img src="${q.image}" class="question-image" style="max-width:100%;"><br>`;
+      }
+
       if(q.type === 'MULTIPLE_CHOICE' || q.type === 'SCALE') {
         q.options.forEach(o => h += `<label class="option-label"><input type="radio" name="q${i}" value="${o}"> ${o}</label>`);
       } else if(q.type === 'CHECKBOX') {
         q.options.forEach(o => h += `<label class="option-label"><input type="checkbox" name="q${i}" value="${o}"> ${o}</label>`);
       } else if(q.type === 'PARAGRAPH') {
         h += `<textarea name="q${i}" rows="4"></textarea>`;
+      } else if(q.type === 'DROPDOWN') {
+        h += `<select name="q${i}"><option value="">-- Chọn --</option>`;
+        q.options.forEach(o => h += `<option value="${o}">${o}</option>`);
+        h += `</select>`;
       }
       cont.innerHTML += h + `</div>`;
     });
@@ -43,7 +57,36 @@
     }, 1000);
   }
 
-  document.getElementById('finish-btn').onclick = () => confirm("Nộp bài?") && sendFinalData();
+  document.getElementById('finish-btn').onclick = () => {
+    let allValid = true;
+    const blocks = document.querySelectorAll('.question-block');
+    blocks.forEach(b => {
+      b.style.border = "none"; // reset border
+      const req = b.dataset.required;
+      if (req === 'true' || req === 'TRUE') {
+        const type = b.dataset.type;
+        let ans = "";
+        if (type === 'MULTIPLE_CHOICE' || type === 'SCALE') ans = (b.querySelector('input:checked') || {}).value || "";
+        else if (type === 'CHECKBOX') ans = Array.from(b.querySelectorAll('input:checked')).map(i => i.value).join(', ');
+        else if (type === 'PARAGRAPH') ans = b.querySelector('textarea').value.trim();
+        else if (type === 'DROPDOWN') ans = b.querySelector('select').value;
+
+        if (!ans) {
+          b.style.border = "2px solid red";
+          allValid = false;
+        }
+      }
+    });
+
+    if (!allValid) {
+      alert("Vui lòng trả lời tất cả các câu hỏi bắt buộc (có dấu * đỏ).");
+      return;
+    }
+
+    if (confirm("Nộp bài?")) {
+      sendFinalData();
+    }
+  };
 
   function sendFinalData() {
     clearInterval(timerInterval);
@@ -53,6 +96,7 @@
       if (type === 'MULTIPLE_CHOICE' || type === 'SCALE') ans = (b.querySelector('input:checked') || {}).value || "";
       else if (type === 'CHECKBOX') ans = Array.from(b.querySelectorAll('input:checked')).map(i => i.value).join(', ');
       else if (type === 'PARAGRAPH') ans = b.querySelector('textarea').value;
+      else if (type === 'DROPDOWN') ans = b.querySelector('select').value;
       return { id: b.dataset.id, question: b.dataset.text, answer: ans };
     });
     google.script.run.withSuccessHandler(m => {
