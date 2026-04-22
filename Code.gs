@@ -42,7 +42,7 @@ function initSystem() {
   let configSheet = ss.getSheetByName('CONFIG');
   if (!configSheet) {
     configSheet = ss.insertSheet('CONFIG');
-    const headers = ['Position', 'IQ_Count', 'EQ_Count', 'ProblemSolving_Count', 'Leadership_Count', 'Personality_Count', 'Duration_Minutes'];
+    const headers = ['Position', 'IQ_Count', 'EQ_Count', 'Problem_Solving_Count', 'Leadership_Count', 'Personality_Count', 'Duration_Minutes'];
     configSheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
     configSheet.appendRow(['Staff', 5, 5, 5, 5, 5, 30]);
   }
@@ -62,10 +62,10 @@ function initSystem() {
 
 function setupValidation(sheet) {
   const rules = {
-    'B': ['Personality', 'IQ', 'EQ', 'ProblemSolving', 'Leadership'],
+    'B': ['Personality', 'IQ', 'EQ', 'Problem_Solving', 'Leadership'],
     'C': ['All', 'Staff', 'Manager', 'Senior'],
     'F': ['Active', 'Inactive', 'Review'],
-    'J': ['MULTIPLECHOICE', 'CHECKBOX', 'PARAGRAPH', 'SCALE', 'DROPDOWN'],
+    'J': ['MULTIPLE_CHOICE', 'CHECKBOX', 'PARAGRAPH', 'SCALE', 'DROPDOWN'],
     'K': ['TRUE', 'FALSE']
   };
   for (let col in rules) {
@@ -77,9 +77,9 @@ function setupValidation(sheet) {
 
 function addSampleQuestions(sheet) {
   const samples = [
-    ['PS001', 'ProblemSolving', 'Manager', 2, 1, 'Active', 'Câu 1: Dự án trễ tiến độ, bạn xử lý thế nào?', '', '', 'MULTIPLECHOICE', 'TRUE', 'Báo cáo', 'Đánh giá nội bộ', 'Thuê thêm', 'Báo KH', '', 1, 'Đánh giá nội bộ', 'Đúng!', '', 'Sai!', ''],
-    ['PER001', 'Personality', 'All', 1, 1, 'Active', 'Câu 1: Khi có xung đột nhóm, bạn sẽ?', '', '', 'MULTIPLECHOICE', 'TRUE', 'Quyết định ngay', 'Thảo luận', 'Giữ hòa khí', 'Phân tích', '', 0, '', 'D, I, S, C mapping...', '', '', ''],
-    ['IQ001', 'IQ', 'All', 1, 1, 'Active', 'Câu 1: 2, 4, 8, 16... số tiếp theo?', '', '', 'MULTIPLECHOICE', 'TRUE', '24', '30', '32', '64', '', 1, '32', 'Đúng!', '', 'Sai!', '']
+    ['PS001', 'Problem_Solving', 'Manager', 2, 1, 'Active', 'Câu 1: Dự án trễ tiến độ, bạn xử lý thế nào?', '', '', 'MULTIPLE_CHOICE', 'TRUE', 'Báo cáo', 'Đánh giá nội bộ', 'Thuê thêm', 'Báo KH', '', 1, 'Đánh giá nội bộ', 'Đúng!', '', 'Sai!', ''],
+    ['PER001', 'Personality', 'All', 1, 1, 'Active', 'Câu 1: Khi có xung đột nhóm, bạn sẽ?', '', '', 'MULTIPLE_CHOICE', 'TRUE', 'Quyết định ngay', 'Thảo luận', 'Giữ hòa khí', 'Phân tích', '', 0, '', 'D, I, S, C mapping...', '', '', ''],
+    ['IQ001', 'IQ', 'All', 1, 1, 'Active', 'Câu 1: 2, 4, 8, 16... số tiếp theo?', '', '', 'MULTIPLE_CHOICE', 'TRUE', '24', '30', '32', '64', '', 1, '32', 'Đúng!', '', 'Sai!', '']
   ];
   sheet.getRange(2, 1, samples.length, samples[0].length).setValues(samples);
 }
@@ -91,18 +91,31 @@ function getPositions() {
 
 function generateTest(candidateInfo) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const config = ss.getSheetByName('CONFIG').getDataRange().getValues().find(r => r[0] === candidateInfo.position);
+  const configData = ss.getSheetByName('CONFIG').getDataRange().getValues();
+  const configHeaders = configData[0];
+  const config = configData.find(r => r[0] === candidateInfo.position);
   if (!config) throw new Error("Không tìm thấy cấu hình.");
 
-  const counts = { IQ: config[1], EQ: config[2], ProblemSolving: config[3], Leadership: config[4], Personality: config[5] };
+  const counts = {};
+  for (let i = 1; i < configHeaders.length; i++) {
+    const h = configHeaders[i];
+    if (h.endsWith('_Count')) {
+      const cat = h.replace('_Count', '');
+      counts[cat] = config[i];
+    }
+  }
+
   const allQ = ss.getSheetByName('QUESTIONBANK').getDataRange().getValues();
   const headers = allQ[0];
-  const activeQ = allQ.slice(1).filter(q => q[headers.indexOf('Status')] === 'Active');
+  const activeQ = allQ.slice(1).filter(q => {
+    return q[headers.indexOf('Status')] === 'Active' &&
+           (q[headers.indexOf('PositionLevel')] === 'All' || q[headers.indexOf('PositionLevel')] === candidateInfo.position);
+  });
 
   const testQuestions = [];
   for (let cat in counts) {
     let pool = activeQ.filter(q => q[headers.indexOf('Category')] === cat).sort(() => Math.random() - 0.5);
-    testQuestions.push(...pool.slice(0, counts[cat]));
+    testQuestions.push(...pool.slice(0, counts[cat] || 0));
   }
 
   return {
@@ -124,12 +137,28 @@ function processResults(submission) {
   submission.answers.forEach(ans => {
     const q = qb.find(r => r[0] === ans.id);
     if (!q) return;
-    let correct = String(ans.answer).trim() === String(q[17]).trim();
+
+    let correct = false;
+    let candidateAns = String(ans.answer).trim();
+    let trueAns = String(q[17]).trim();
+
+    if (q[9] === 'CHECKBOX') {
+      let candParts = candidateAns.split(',').map(s => s.trim().toLowerCase()).filter(s => s);
+      let trueParts = trueAns.split(',').map(s => s.trim().toLowerCase()).filter(s => s);
+      candParts.sort();
+      trueParts.sort();
+      correct = (candParts.join(',') === trueParts.join(','));
+    } else {
+      correct = candidateAns.toLowerCase() === trueAns.toLowerCase();
+    }
+
     let pts = correct ? (Number(q[16]) || 0) : 0;
     score += pts;
-    if (q[1] === 'Personality' || q[9] === 'PARAGRAPH' || q[1] === 'Leadership') {
+
+    if (q[1] === 'Personality' || q[9] === 'PARAGRAPH' || (Number(q[16]) || 0) === 0) {
       rawAI.push(`Q: ${ans.question} | A: ${ans.answer}`);
     }
+
     ss.getSheetByName('ANSWERS').appendRow([ts, submission.candidateInfo.email, ans.id, ans.question, ans.answer, correct, pts]);
   });
 

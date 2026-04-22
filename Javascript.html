@@ -22,7 +22,7 @@
     const cont = document.getElementById('questions-container');
     testData.questions.forEach((q, i) => {
       let h = `<div class="question-block" data-id="${q.id}" data-type="${q.type}" data-text="${q.question}"><b>${q.question}</b>`;
-      if(q.type === 'MULTIPLECHOICE' || q.type === 'SCALE') {
+      if(q.type === 'MULTIPLE_CHOICE' || q.type === 'SCALE') {
         q.options.forEach(o => h += `<label class="option-label"><input type="radio" name="q${i}" value="${o}"> ${o}</label>`);
       } else if(q.type === 'CHECKBOX') {
         q.options.forEach(o => h += `<label class="option-label"><input type="checkbox" name="q${i}" value="${o}"> ${o}</label>`);
@@ -50,7 +50,7 @@
     const answers = Array.from(document.querySelectorAll('.question-block')).map(b => {
       const type = b.dataset.type;
       let ans = "";
-      if (type === 'MULTIPLECHOICE' || type === 'SCALE') ans = (b.querySelector('input:checked') || {}).value || "";
+      if (type === 'MULTIPLE_CHOICE' || type === 'SCALE') ans = (b.querySelector('input:checked') || {}).value || "";
       else if (type === 'CHECKBOX') ans = Array.from(b.querySelectorAll('input:checked')).map(i => i.value).join(', ');
       else if (type === 'PARAGRAPH') ans = b.querySelector('textarea').value;
       return { id: b.dataset.id, question: b.dataset.text, answer: ans };
