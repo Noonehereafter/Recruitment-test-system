@@ -14,6 +14,7 @@ function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('Hệ thống Test')
     .addItem('Khởi tạo hệ thống', 'initSystem')
+    .addItem('Mở Admin Panel', 'showAdminSidebar')
     .addItem('Xuất kết quả ứng viên', 'showExportPrompt')
     .addToUi();
 }
@@ -23,6 +24,85 @@ function showExportPrompt() {
       .setWidth(600)
       .setHeight(500);
   SpreadsheetApp.getUi().showModalDialog(html, 'Xuất kết quả bài Test');
+}
+
+function showAdminSidebar() {
+  const html = HtmlService.createTemplateFromFile('AdminSidebar').evaluate().setTitle('Admin Panel');
+  SpreadsheetApp.getUi().showSidebar(html);
+}
+
+function getWebAppUrl() {
+  return ScriptApp.getService().getUrl();
+}
+
+function getCandidateReport(email) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const qbData = ss.getSheetByName('QUESTIONBANK').getDataRange().getValues();
+  const ansData = ss.getSheetByName('ANSWERS').getDataRange().getValues();
+  const resData = ss.getSheetByName('RESULTS').getDataRange().getValues();
+
+  const cRes = resData.find(r => r[2] === email);
+  if (!cRes) return null;
+
+  const candidateAnswers = ansData.filter(r => r[1] === email);
+
+  let catScores = {};
+  let paragraphAnswers = [];
+
+  candidateAnswers.forEach(ans => {
+    const qID = ans[2];
+    const pts = Number(ans[6]) || 0;
+    const qData = qbData.find(q => q[0] === qID);
+
+    if (qData) {
+      let cat = qData[1];
+      if (!catScores[cat]) catScores[cat] = 0;
+      catScores[cat] += pts;
+
+      if (qData[9] === 'PARAGRAPH') {
+        paragraphAnswers.push({ id: qID, question: qData[6], answer: ans[4], currentScore: pts });
+      }
+    }
+  });
+
+  return {
+    email: email,
+    totalScore: cRes[5],
+    timeTaken: cRes[7],
+    discProfile: cRes[12],
+    catScores: catScores,
+    paragraphAnswers: paragraphAnswers
+  };
+}
+
+function updateParagraphScore(email, qId, newScore) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ansSheet = ss.getSheetByName('ANSWERS');
+  const resSheet = ss.getSheetByName('RESULTS');
+
+  const ansData = ansSheet.getDataRange().getValues();
+  let scoreDiff = 0;
+
+  for (let i = 1; i < ansData.length; i++) {
+    if (ansData[i][1] === email && ansData[i][2] === qId) {
+      const oldScore = Number(ansData[i][6]) || 0;
+      scoreDiff = Number(newScore) - oldScore;
+      ansSheet.getRange(i + 1, 7).setValue(Number(newScore));
+      break;
+    }
+  }
+
+  if (scoreDiff !== 0) {
+    const resData = resSheet.getDataRange().getValues();
+    for (let i = 1; i < resData.length; i++) {
+      if (resData[i][2] === email) {
+        const currentTotal = Number(resData[i][5]) || 0;
+        resSheet.getRange(i + 1, 6).setValue(currentTotal + scoreDiff);
+        break;
+      }
+    }
+  }
+  return true;
 }
 
 function generateExportData(email) {
@@ -45,8 +125,11 @@ function generateExportData(email) {
     if (qData) {
       output += `[${qData[1]}] Câu hỏi: ${qData[6]}\n`;
       output += `- Ứng viên chọn: ${candidateAnswer}\n`;
-      output += `- Đáp án đúng của hệ thống: ${qData[17]}\n`;
-      output += `- Kết quả chấm tự động: ${isCorrect ? 'ĐÚNG' : 'SAI'}\n\n`;
+      if (qData[1] !== 'Personality' && qData[9] !== 'PARAGRAPH') {
+        output += `- Đáp án đúng của hệ thống: ${qData[17]}\n`;
+        output += `- Kết quả chấm tự động: ${isCorrect ? 'ĐÚNG' : 'SAI'}\n`;
+      }
+      output += `\n`;
     }
   });
 
@@ -90,7 +173,17 @@ function initSystem() {
 
   if (!ss.getSheetByName('RESULTS')) {
     let resSheet = ss.insertSheet('RESULTS');
-    resSheet.getRange(1, 1, 1, 7).setValues([['Timestamp', 'FullName', 'Email', 'Phone', 'Position', 'Total Score', 'DISC/MBTI Raw Data']]).setFontWeight('bold');
+    resSheet.getRange(1, 1, 1, 13).setValues([['Timestamp', 'FullName', 'Email', 'Phone', 'Position', 'Total Score', 'DISC/MBTI Raw Data', 'Time Taken (s)', 'DISC_D', 'DISC_I', 'DISC_S', 'DISC_C', 'DISC_Profile']]).setFontWeight('bold');
+  }
+
+  if (!ss.getSheetByName('AUTOSAVES')) {
+    let autoSheet = ss.insertSheet('AUTOSAVES');
+    autoSheet.getRange(1, 1, 1, 3).setValues([['Timestamp', 'Email', 'JSON Data']]).setFontWeight('bold');
+  }
+
+  if (!ss.getSheetByName('ASSIGNMENTS')) {
+    let assSheet = ss.insertSheet('ASSIGNMENTS');
+    assSheet.getRange(1, 1, 1, 3).setValues([['Email', 'Position', 'Assigned Question IDs (Comma separated)']]).setFontWeight('bold');
   }
   
   return "Hệ thống đã khởi tạo thành công!";
@@ -132,48 +225,60 @@ function generateTest(candidateInfo) {
   const config = configData.find(r => r[0] === candidateInfo.position);
   if (!config) throw new Error("Không tìm thấy cấu hình.");
 
-  const diffCounts = {}; // e.g. { "IQ": { "1": 2, "2": 2, "3": 1 }, "Personality": { "ANY": 5 } }
-  for (let i = 1; i < configHeaders.length; i++) {
-    const h = configHeaders[i];
-    if (h.endsWith('_Count')) {
-      const parts = h.replace('_Count', '').split('_');
-      let cat = parts[0];
-      let diff = "ANY";
-
-      // Handle categories with multiple underscores (like Problem_Solving)
-      if (parts.length >= 2 && !isNaN(parts[parts.length - 1])) {
-        diff = parts.pop();
-        cat = parts.join('_');
-      } else if (parts.length > 1) {
-        cat = parts.join('_');
-      }
-
-      if (!diffCounts[cat]) diffCounts[cat] = {};
-      diffCounts[cat][diff] = Number(config[i]) || 0;
-    }
-  }
-
   const allQ = ss.getSheetByName('QUESTIONBANK').getDataRange().getValues();
   const headers = allQ[0];
-  const activeQ = allQ.slice(1).filter(q => {
-    return q[headers.indexOf('Status')] === 'Active' &&
-           (q[headers.indexOf('PositionLevel')] === 'All' || q[headers.indexOf('PositionLevel')] === candidateInfo.position);
-  });
+  let testQuestions = [];
 
-  const testQuestions = [];
-  for (let cat in diffCounts) {
-    for (let diff in diffCounts[cat]) {
-      let countNeeded = diffCounts[cat][diff];
-      if (countNeeded <= 0) continue;
+  // Check if assigned specifically
+  let assignmentsSheet = ss.getSheetByName('ASSIGNMENTS');
+  let specificAssignment = null;
+  if (assignmentsSheet) {
+    const assData = assignmentsSheet.getDataRange().getValues();
+    specificAssignment = assData.find(r => r[0] === candidateInfo.email);
+  }
 
-      let pool = activeQ.filter(q => {
-        let matchCat = q[headers.indexOf('Category')] === cat;
-        if (!matchCat) return false;
-        if (diff === "ANY") return true;
-        return String(q[headers.indexOf('Difficulty')]) === diff;
-      }).sort(() => Math.random() - 0.5);
+  if (specificAssignment && specificAssignment[2]) {
+    const assignedIds = specificAssignment[2].toString().split(',').map(s => s.trim());
+    testQuestions = allQ.slice(1).filter(q => assignedIds.includes(q[0].toString()));
+  } else {
+    // Regular random logic
+    const diffCounts = {};
+    for (let i = 1; i < configHeaders.length; i++) {
+      const h = configHeaders[i];
+      if (h.endsWith('_Count')) {
+        const parts = h.replace('_Count', '').split('_');
+        let cat = parts[0];
+        let diff = "ANY";
+        if (parts.length >= 2 && !isNaN(parts[parts.length - 1])) {
+          diff = parts.pop();
+          cat = parts.join('_');
+        } else if (parts.length > 1) {
+          cat = parts.join('_');
+        }
+        if (!diffCounts[cat]) diffCounts[cat] = {};
+        diffCounts[cat][diff] = Number(config[i]) || 0;
+      }
+    }
 
-      testQuestions.push(...pool.slice(0, countNeeded));
+    const activeQ = allQ.slice(1).filter(q => {
+      return q[headers.indexOf('Status')] === 'Active' &&
+             (q[headers.indexOf('PositionLevel')] === 'All' || q[headers.indexOf('PositionLevel')] === candidateInfo.position);
+    });
+
+    for (let cat in diffCounts) {
+      for (let diff in diffCounts[cat]) {
+        let countNeeded = diffCounts[cat][diff];
+        if (countNeeded <= 0) continue;
+
+        let pool = activeQ.filter(q => {
+          let matchCat = q[headers.indexOf('Category')] === cat;
+          if (!matchCat) return false;
+          if (diff === "ANY") return true;
+          return String(q[headers.indexOf('Difficulty')]) === diff;
+        }).sort(() => Math.random() - 0.5);
+
+        testQuestions.push(...pool.slice(0, countNeeded));
+      }
     }
   }
 
@@ -192,6 +297,7 @@ function processResults(submission) {
   const qb = ss.getSheetByName('QUESTIONBANK').getDataRange().getValues();
   const ts = new Date();
   let score = 0, rawAI = [];
+  let discCounts = {D: 0, I: 0, S: 0, C: 0};
 
   submission.answers.forEach(ans => {
     const q = qb.find(r => r[0] === ans.id);
@@ -214,6 +320,13 @@ function processResults(submission) {
     let pts = correct ? (Number(q[16]) || 0) : 0;
     score += pts;
 
+    if (q[1] === 'Personality') {
+       if (candidateAns === String(q[11]).trim()) discCounts.D++;
+       else if (candidateAns === String(q[12]).trim()) discCounts.I++;
+       else if (candidateAns === String(q[13]).trim()) discCounts.S++;
+       else if (candidateAns === String(q[14]).trim()) discCounts.C++;
+    }
+
     if (q[1] === 'Personality' || q[9] === 'PARAGRAPH' || (Number(q[16]) || 0) === 0) {
       rawAI.push(`Q: ${ans.question} | A: ${ans.answer}`);
     }
@@ -221,6 +334,36 @@ function processResults(submission) {
     ss.getSheetByName('ANSWERS').appendRow([ts, submission.candidateInfo.email, ans.id, ans.question, ans.answer, correct, pts]);
   });
 
-  ss.getSheetByName('RESULTS').appendRow([ts, submission.candidateInfo.fullName, submission.candidateInfo.email, submission.candidateInfo.phone, submission.candidateInfo.position, score, rawAI.join('\n')]);
+  // Calculate DISC Profile
+  let discArray = [
+    {type: 'D', count: discCounts.D},
+    {type: 'I', count: discCounts.I},
+    {type: 'S', count: discCounts.S},
+    {type: 'C', count: discCounts.C}
+  ];
+  discArray.sort((a, b) => b.count - a.count);
+  let discProfile = `${discArray[0].type}-${discArray[1].type}`;
+
+  ss.getSheetByName('RESULTS').appendRow([ts, submission.candidateInfo.fullName, submission.candidateInfo.email, submission.candidateInfo.phone, submission.candidateInfo.position, score, rawAI.join('\n'), submission.timeTaken || 0, discCounts.D, discCounts.I, discCounts.S, discCounts.C, discProfile]);
   return "Nộp bài thành công!";
+}
+
+function saveProgress(email, data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('AUTOSAVES');
+  if (!sheet) return;
+  const ts = new Date();
+
+  // Try to find existing row
+  const rData = sheet.getDataRange().getValues();
+  for (let i = 1; i < rData.length; i++) {
+    if (rData[i][1] === email) {
+      sheet.getRange(i + 1, 1).setValue(ts);
+      sheet.getRange(i + 1, 3).setValue(JSON.stringify(data));
+      return;
+    }
+  }
+
+  // If not found, append
+  sheet.appendRow([ts, email, JSON.stringify(data)]);
 }

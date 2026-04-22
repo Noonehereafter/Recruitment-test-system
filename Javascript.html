@@ -1,5 +1,5 @@
 <script>
-  let testData, timerInterval, timeRemaining;
+  let testData, timerInterval, timeRemaining, totalTime, autoSaveInterval;
 
   window.onload = () => google.script.run.withSuccessHandler(pos => {
     const sel = document.getElementById('position');
@@ -12,6 +12,7 @@
     document.getElementById('loading').style.display = 'block';
     google.script.run.withSuccessHandler(data => {
       testData = data; renderTest(); startTimer(data.duration);
+      startAutoSave();
       document.getElementById('loading').style.display = 'none';
       document.getElementById('registration-screen').style.display = 'none';
       document.getElementById('test-screen').style.display = 'block';
@@ -55,13 +56,32 @@
   }
 
   function startTimer(min) {
-    timeRemaining = min * 60;
+    totalTime = min * 60;
+    timeRemaining = totalTime;
     timerInterval = setInterval(() => {
       timeRemaining--;
       let m = Math.floor(timeRemaining / 60), s = timeRemaining % 60;
       document.getElementById('timer').textContent = `${m}:${s < 10 ? '0'+s : s}`;
       if (timeRemaining <= 0) { clearInterval(timerInterval); sendFinalData(); }
     }, 1000);
+  }
+
+  function getAnswers() {
+    return Array.from(document.querySelectorAll('.question-block')).map(b => {
+      const type = b.dataset.type;
+      let ans = "";
+      if (type === 'MULTIPLE_CHOICE' || type === 'SCALE') ans = (b.querySelector('input:checked') || {}).value || "";
+      else if (type === 'CHECKBOX') ans = Array.from(b.querySelectorAll('input:checked')).map(i => i.value).join(', ');
+      else if (type === 'PARAGRAPH') ans = b.querySelector('textarea').value;
+      else if (type === 'DROPDOWN') ans = b.querySelector('select').value;
+      return { id: b.dataset.id, question: b.dataset.text, answer: ans };
+    });
+  }
+
+  function startAutoSave() {
+    autoSaveInterval = setInterval(() => {
+      google.script.run.saveProgress(testData.candidateInfo.email, getAnswers());
+    }, 5000);
   }
 
   document.getElementById('finish-btn').onclick = () => {
@@ -97,19 +117,13 @@
 
   function sendFinalData() {
     clearInterval(timerInterval);
-    const answers = Array.from(document.querySelectorAll('.question-block')).map(b => {
-      const type = b.dataset.type;
-      let ans = "";
-      if (type === 'MULTIPLE_CHOICE' || type === 'SCALE') ans = (b.querySelector('input:checked') || {}).value || "";
-      else if (type === 'CHECKBOX') ans = Array.from(b.querySelectorAll('input:checked')).map(i => i.value).join(', ');
-      else if (type === 'PARAGRAPH') ans = b.querySelector('textarea').value;
-      else if (type === 'DROPDOWN') ans = b.querySelector('select').value;
-      return { id: b.dataset.id, question: b.dataset.text, answer: ans };
-    });
+    clearInterval(autoSaveInterval);
+    const answers = getAnswers();
+    let timeTaken = totalTime - timeRemaining;
     google.script.run.withSuccessHandler(m => {
       document.getElementById('test-screen').style.display = 'none';
       document.getElementById('result-screen').style.display = 'block';
       document.getElementById('result-msg').textContent = m;
-    }).processResults({ candidateInfo: testData.candidateInfo, answers: answers });
+    }).processResults({ candidateInfo: testData.candidateInfo, answers: answers, timeTaken: timeTaken });
   }
 </script>
