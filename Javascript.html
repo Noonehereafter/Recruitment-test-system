@@ -1,0 +1,64 @@
+<script>
+  let testData, timerInterval, timeRemaining;
+
+  window.onload = () => google.script.run.withSuccessHandler(pos => {
+    const sel = document.getElementById('position');
+    pos.forEach(p => sel.add(new Option(p, p)));
+  }).getPositions();
+
+  document.getElementById('reg-form').onsubmit = e => {
+    e.preventDefault();
+    const info = { fullName: document.getElementById('fullName').value, email: document.getElementById('email').value, phone: document.getElementById('phone').value, position: document.getElementById('position').value };
+    document.getElementById('loading').style.display = 'block';
+    google.script.run.withSuccessHandler(data => {
+      testData = data; renderTest(); startTimer(data.duration);
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('registration-screen').style.display = 'none';
+      document.getElementById('test-screen').style.display = 'block';
+    }).generateTest(info);
+  };
+
+  function renderTest() {
+    const cont = document.getElementById('questions-container');
+    testData.questions.forEach((q, i) => {
+      let h = `<div class="question-block" data-id="${q.id}" data-type="${q.type}" data-text="${q.question}"><b>${q.question}</b>`;
+      if(q.type === 'MULTIPLECHOICE' || q.type === 'SCALE') {
+        q.options.forEach(o => h += `<label class="option-label"><input type="radio" name="q${i}" value="${o}"> ${o}</label>`);
+      } else if(q.type === 'CHECKBOX') {
+        q.options.forEach(o => h += `<label class="option-label"><input type="checkbox" name="q${i}" value="${o}"> ${o}</label>`);
+      } else if(q.type === 'PARAGRAPH') {
+        h += `<textarea name="q${i}" rows="4"></textarea>`;
+      }
+      cont.innerHTML += h + `</div>`;
+    });
+  }
+
+  function startTimer(min) {
+    timeRemaining = min * 60;
+    timerInterval = setInterval(() => {
+      timeRemaining--;
+      let m = Math.floor(timeRemaining / 60), s = timeRemaining % 60;
+      document.getElementById('timer').textContent = `${m}:${s < 10 ? '0'+s : s}`;
+      if (timeRemaining <= 0) { clearInterval(timerInterval); sendFinalData(); }
+    }, 1000);
+  }
+
+  document.getElementById('finish-btn').onclick = () => confirm("Nộp bài?") && sendFinalData();
+
+  function sendFinalData() {
+    clearInterval(timerInterval);
+    const answers = Array.from(document.querySelectorAll('.question-block')).map(b => {
+      const type = b.dataset.type;
+      let ans = "";
+      if (type === 'MULTIPLECHOICE' || type === 'SCALE') ans = (b.querySelector('input:checked') || {}).value || "";
+      else if (type === 'CHECKBOX') ans = Array.from(b.querySelectorAll('input:checked')).map(i => i.value).join(', ');
+      else if (type === 'PARAGRAPH') ans = b.querySelector('textarea').value;
+      return { id: b.dataset.id, question: b.dataset.text, answer: ans };
+    });
+    google.script.run.withSuccessHandler(m => {
+      document.getElementById('test-screen').style.display = 'none';
+      document.getElementById('result-screen').style.display = 'block';
+      document.getElementById('result-msg').textContent = m;
+    }).processResults({ candidateInfo: testData.candidateInfo, answers: answers });
+  }
+</script>
