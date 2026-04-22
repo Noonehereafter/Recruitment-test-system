@@ -2,7 +2,14 @@
  * Google Apps Script for Recruitment Test System
  */
 
-function doGet() {
+function doGet(e) {
+  if (e && e.parameter && e.parameter.page === 'admin') {
+    return HtmlService.createTemplateFromFile('AdminPanel')
+      .evaluate()
+      .setTitle('Admin Panel - Hệ thống Test')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
   return HtmlService.createTemplateFromFile('Index')
     .evaluate()
     .setTitle('Hệ thống Test Tuyển dụng')
@@ -14,14 +21,16 @@ function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('Hệ thống Test')
     .addItem('Khởi tạo hệ thống', 'initSystem')
-    .addItem('Mở Admin Panel', 'showAdminSidebar')
+    .addItem('Mở Admin Panel (Tab mới)', 'showAdminModal')
     .addItem('Xuất kết quả ứng viên', 'showExportPrompt')
     .addToUi();
 }
 
-function showAdminSidebar() {
-  const html = HtmlService.createTemplateFromFile('AdminSidebar').evaluate().setTitle('Admin Panel');
-  SpreadsheetApp.getUi().showSidebar(html);
+function showAdminModal() {
+  const url = ScriptApp.getService().getUrl() + '?page=admin';
+  const html = HtmlService.createHtmlOutput(`<script>window.open('${url}', '_blank'); google.script.host.close();</script>`)
+    .setWidth(300).setHeight(100);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Đang mở Admin Panel...');
 }
 
 function showExportPrompt() {
@@ -35,7 +44,7 @@ function getWebAppUrl() {
   return ScriptApp.getService().getUrl();
 }
 
-function assignQuestionsToCandidate(email, position, idsString) {
+function assignQuestionsToCandidate(type, value, idsString) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('ASSIGNMENTS');
   if (!sheet) return "Lỗi: Không tìm thấy sheet ASSIGNMENTS.";
@@ -45,15 +54,112 @@ function assignQuestionsToCandidate(email, position, idsString) {
 
   const data = sheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === email) {
-      sheet.getRange(i + 1, 2).setValue(position);
+    if (data[i][0] === type && data[i][1] === value) {
       sheet.getRange(i + 1, 3).setValue(ids);
       return "Đã cập nhật chỉ định câu hỏi thành công!";
     }
   }
 
-  sheet.appendRow([email, position, ids]);
+  sheet.appendRow([type, value, ids]);
   return "Đã thêm chỉ định câu hỏi thành công!";
+}
+
+function getSystemSettings() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('SYSTEM_SETTINGS');
+  if (!sheet) return {};
+  const data = sheet.getDataRange().getValues();
+  let settings = {};
+  for(let i=1; i<data.length; i++){
+    settings[data[i][0]] = data[i][1];
+  }
+  return settings;
+}
+
+function saveSystemSettings(settingsObj) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('SYSTEM_SETTINGS');
+  if (!sheet) return "Lỗi: Không tìm thấy SYSTEM_SETTINGS";
+  const data = sheet.getDataRange().getValues();
+
+  for(let key in settingsObj) {
+    let found = false;
+    for(let i=1; i<data.length; i++){
+      if(data[i][0] === key) {
+        sheet.getRange(i+1, 2).setValue(settingsObj[key]);
+        found = true;
+        break;
+      }
+    }
+    if(!found) {
+      sheet.appendRow([key, settingsObj[key]]);
+    }
+  }
+  return "Lưu cài đặt thành công!";
+}
+
+function getCandidatesList() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const resSheet = ss.getSheetByName('RESULTS');
+  if(!resSheet) return [];
+  const data = resSheet.getDataRange().getValues();
+  let list = [];
+  for(let i=1; i<data.length; i++){
+    list.push({
+      timestamp: data[i][0],
+      fullName: data[i][1],
+      email: data[i][2],
+      position: data[i][4],
+      totalScore: data[i][5]
+    });
+  }
+  return list;
+}
+
+function getBulkReports(emails) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const qbData = ss.getSheetByName('QUESTIONBANK').getDataRange().getValues();
+  const ansData = ss.getSheetByName('ANSWERS').getDataRange().getValues();
+  const resData = ss.getSheetByName('RESULTS').getDataRange().getValues();
+
+  let reports = [];
+
+  emails.forEach(email => {
+    const cRes = resData.find(r => r[2] === email);
+    if (!cRes) return;
+
+    const candidateAnswers = ansData.filter(r => r[1] === email);
+    let catScores = {};
+    let paragraphAnswers = [];
+
+    candidateAnswers.forEach(ans => {
+      const qID = ans[2];
+      const pts = Number(ans[6]) || 0;
+      const qData = qbData.find(q => q[0] === qID);
+
+      if (qData) {
+        let cat = qData[1];
+        if (!catScores[cat]) catScores[cat] = 0;
+        catScores[cat] += pts;
+
+        if (qData[9] === 'PARAGRAPH') {
+          paragraphAnswers.push({ id: qID, question: qData[6], answer: ans[4], currentScore: pts });
+        }
+      }
+    });
+
+    reports.push({
+      email: email,
+      fullName: cRes[1],
+      totalScore: cRes[5],
+      timeTaken: cRes[7],
+      discProfile: cRes[12],
+      catScores: catScores,
+      paragraphAnswers: paragraphAnswers
+    });
+  });
+
+  return reports;
 }
 
 function getCandidateReport(email) {
@@ -208,9 +314,10 @@ function initSystem() {
   let configSheet = ss.getSheetByName('CONFIG');
   if (!configSheet) {
     configSheet = ss.insertSheet('CONFIG');
-    const headers = ['Position', 'IQ_Count', 'EQ_Count', 'ProblemSolving_Count', 'Leadership_Count', 'Personality_Count', 'Duration_Minutes'];
+    const headers = ['Position', 'IQ_1_Count', 'IQ_2_Count', 'IQ_3_Count', 'EQ_1_Count', 'EQ_2_Count', 'EQ_3_Count', 'Problem_Solving_1_Count', 'Problem_Solving_2_Count', 'Problem_Solving_3_Count', 'Leadership_1_Count', 'Leadership_2_Count', 'Leadership_3_Count', 'Personality_1_Count', 'Duration_Minutes'];
     configSheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
-    configSheet.appendRow(['Staff', 5, 5, 5, 5, 5, 30]);
+    configSheet.appendRow(['Nhân viên văn phòng', 2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 1, 5, 30]);
+    configSheet.appendRow(['Quản lý cấp trung', 1, 2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 5, 45]);
   }
 
   if (!ss.getSheetByName('ANSWERS')) {
@@ -230,7 +337,15 @@ function initSystem() {
 
   if (!ss.getSheetByName('ASSIGNMENTS')) {
     let assSheet = ss.insertSheet('ASSIGNMENTS');
-    assSheet.getRange(1, 1, 1, 3).setValues([['Email', 'Position', 'Assigned Question IDs (Comma separated)']]).setFontWeight('bold');
+    assSheet.getRange(1, 1, 1, 3).setValues([['Assign_Type', 'Assign_Value', 'Assigned_Question_IDs']]).setFontWeight('bold');
+  }
+
+  if (!ss.getSheetByName('SYSTEM_SETTINGS')) {
+    let setSheet = ss.insertSheet('SYSTEM_SETTINGS');
+    setSheet.getRange(1, 1, 1, 2).setValues([['Key', 'Value']]).setFontWeight('bold');
+    setSheet.appendRow(['Logo_URL', '']);
+    setSheet.appendRow(['Anti_Cheat_Enabled', 'TRUE']);
+    setSheet.appendRow(['Anti_Cheat_Max_Violations', '3']);
   }
   
   return "Hệ thống đã khởi tạo thành công!";
@@ -270,7 +385,7 @@ function generateTest(candidateInfo) {
   const configData = ss.getSheetByName('CONFIG').getDataRange().getValues();
   const configHeaders = configData[0];
   const config = configData.find(r => r[0] === candidateInfo.position);
-  if (!config) throw new Error("Không tìm thấy cấu hình.");
+  if (!config) throw new Error("Không tìm thấy cấu hình cho vị trí này.");
 
   const allQ = ss.getSheetByName('QUESTIONBANK').getDataRange().getValues();
   const headers = allQ[0];
@@ -281,14 +396,17 @@ function generateTest(candidateInfo) {
   let specificAssignment = null;
   if (assignmentsSheet) {
     const assData = assignmentsSheet.getDataRange().getValues();
-    specificAssignment = assData.find(r => r[0] === candidateInfo.email);
+    // Prioritize Email, then Phone, then Position
+    specificAssignment = assData.find(r => r[0] === 'Email' && r[1] === candidateInfo.email) ||
+                         assData.find(r => r[0] === 'Phone' && r[1] === candidateInfo.phone) ||
+                         assData.find(r => r[0] === 'Position' && r[1] === candidateInfo.position);
   }
 
   if (specificAssignment && specificAssignment[2]) {
     const assignedIds = specificAssignment[2].toString().split(',').map(s => s.trim());
     testQuestions = allQ.slice(1).filter(q => assignedIds.includes(q[0].toString()));
   } else {
-    // Regular random logic
+    // Regular random logic based on Difficulty mapping
     const diffCounts = {};
     for (let i = 1; i < configHeaders.length; i++) {
       const h = configHeaders[i];
@@ -335,7 +453,8 @@ function generateTest(candidateInfo) {
       options: [q[11], q[12], q[13], q[14], q[15]].filter(o => o !== ""), points: q[16]
     })),
     duration: config[configHeaders.indexOf('Duration_Minutes')],
-    candidateInfo: candidateInfo
+    candidateInfo: candidateInfo,
+    settings: getSystemSettings()
   };
 }
 

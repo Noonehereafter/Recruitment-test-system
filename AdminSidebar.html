@@ -202,7 +202,7 @@
       google.script.run.withSuccessHandler(msg => {
         document.getElementById('loadingAssign').style.display = 'none';
         alert(msg);
-      }).assignQuestionsToCandidate(email, pos, ids);
+      }).assignQuestionsToCandidate('Email', email, ids);
     }
 
     function fetchReport() {
@@ -253,6 +253,10 @@
       });
     }
 
+    function escapeHtml(unsafe) {
+      return (unsafe || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
     function renderParagraphs(paras, email) {
       const list = document.getElementById('paraList');
       list.innerHTML = "";
@@ -267,9 +271,11 @@
         div.style.paddingBottom = "10px";
         div.style.borderBottom = "1px dashed #ccc";
 
+        let safeAnswer = escapeHtml(p.answer);
+
         div.innerHTML = `
-          <strong>${p.question}</strong>
-          <p style="background:#f9f9f9; padding:8px; border-radius:4px; font-size:13px;">${p.answer}</p>
+          <strong>${escapeHtml(p.question)}</strong>
+          <p style="background:#f9f9f9; padding:8px; border-radius:4px; font-size:13px;">${safeAnswer}</p>
           <div style="display:flex; gap:10px; align-items:center;">
             <input type="number" id="score_${p.id}" value="${p.currentScore}" style="width:70px;">
             <button onclick="updateScore('${email}', '${p.id}')" style="background:#2ecc71; color:white; border:none; padding:8px; border-radius:4px; cursor:pointer;">Lưu điểm</button>

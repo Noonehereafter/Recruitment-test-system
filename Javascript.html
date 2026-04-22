@@ -1,63 +1,188 @@
 <script>
   let testData, timerInterval, timeRemaining, totalTime, autoSaveInterval;
+  let pages = [], currentPageIndex = 0;
+  let cheatViolations = 0, maxViolations = 0, isAntiCheatEnabled = false;
 
-  window.onload = () => google.script.run.withSuccessHandler(pos => {
-    const sel = document.getElementById('position');
-    pos.forEach(p => sel.add(new Option(p, p)));
-  }).getPositions();
+  window.onload = () => {
+    // Check saved local state
+    const savedState = localStorage.getItem('testState');
+    if (savedState) {
+      document.getElementById('resume-msg').style.display = 'block';
+    }
+
+    google.script.run.withSuccessHandler(pos => {
+      const sel = document.getElementById('position');
+      pos.forEach(p => sel.add(new Option(p, p)));
+    }).getPositions();
+  };
 
   document.getElementById('reg-form').onsubmit = e => {
     e.preventDefault();
     const info = { fullName: document.getElementById('fullName').value, email: document.getElementById('email').value, phone: document.getElementById('phone').value, position: document.getElementById('position').value };
     document.getElementById('loading').style.display = 'block';
+
+    const savedStateStr = localStorage.getItem('testState');
+    if (savedStateStr) {
+      try {
+        const savedState = JSON.parse(savedStateStr);
+        if (savedState.email === info.email) {
+           testData = savedState.testData;
+           timeRemaining = savedState.timeRemaining;
+           totalTime = savedState.totalTime;
+           document.getElementById('loading').style.display = 'none';
+           setupTestEnvironment();
+           restoreAnswers(savedState.answers);
+           return;
+        }
+      } catch (e) {}
+    }
+
     google.script.run.withSuccessHandler(data => {
-      testData = data; renderTest(); startTimer(data.duration);
-      startAutoSave();
+      testData = data;
+      timeRemaining = data.duration * 60;
+      totalTime = timeRemaining;
       document.getElementById('loading').style.display = 'none';
-      document.getElementById('registration-screen').style.display = 'none';
-      document.getElementById('test-screen').style.display = 'block';
+      setupTestEnvironment();
     }).generateTest(info);
   };
 
+  function setupTestEnvironment() {
+    // Initialize Settings
+    if (testData.settings) {
+      if (testData.settings['Logo_URL']) {
+        const logo = document.getElementById('company-logo');
+        logo.src = testData.settings['Logo_URL'];
+        logo.style.display = 'block';
+      }
+      isAntiCheatEnabled = String(testData.settings['Anti_Cheat_Enabled']).toUpperCase() === 'TRUE';
+      maxViolations = parseInt(testData.settings['Anti_Cheat_Max_Violations']) || 3;
+    }
+
+    if (isAntiCheatEnabled) {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+
+    renderTest();
+    startTimer();
+    startAutoSave();
+
+    document.getElementById('registration-screen').style.display = 'none';
+    document.getElementById('test-screen').style.display = 'block';
+  }
+
+  function handleVisibilityChange() {
+    if (document.hidden) {
+      cheatViolations++;
+      if (cheatViolations > maxViolations) {
+        alert('Bạn đã vi phạm quy chế thi (chuyển tab/cửa sổ) quá số lần cho phép. Bài thi sẽ tự động nộp.');
+        sendFinalData();
+      } else {
+        alert(`Cảnh báo: Bạn không được phép chuyển tab hoặc cửa sổ khi đang làm bài. Vi phạm lần ${cheatViolations}/${maxViolations}.`);
+      }
+    }
+  }
+
   function renderTest() {
     const cont = document.getElementById('questions-container');
+    const paletteGrid = document.getElementById('palette-grid');
+    cont.innerHTML = "";
+    paletteGrid.innerHTML = "";
+    pages = [];
+
     let currentCategory = "";
+    let currentGroupDiv = null;
 
     testData.questions.forEach((q, i) => {
-      if (q.category && q.category !== currentCategory) {
+      // Pagination Logic
+      if (q.category !== currentCategory) {
         currentCategory = q.category;
-        cont.innerHTML += `<h3 style="margin-top: 30px; border-bottom: 2px solid #3498db; padding-bottom: 5px; color: #2c3e50;">Phần: ${currentCategory}</h3>`;
+        currentGroupDiv = document.createElement('div');
+        currentGroupDiv.className = "page-group fade-in-up";
+        currentGroupDiv.id = "page-" + pages.length;
+        currentGroupDiv.innerHTML = `<h3 class="section-title">Phần: ${currentCategory}</h3>`;
+        cont.appendChild(currentGroupDiv);
+        pages.push(currentGroupDiv);
       }
 
+      // Palette Box
+      const pBox = document.createElement('div');
+      pBox.className = "palette-box";
+      pBox.id = "pbox-" + q.id;
+      pBox.innerText = (i + 1);
+      pBox.onclick = () => jumpToQuestion(q.id, pages.indexOf(currentGroupDiv));
+      paletteGrid.appendChild(pBox);
+
+      // Question Block
       const requiredMarker = (q.required === true || q.required === "TRUE" || q.required === "true") ? `<span style="color:red;">*</span>` : "";
-      let h = `<div class="question-block" data-id="${q.id}" data-type="${q.type}" data-text="${q.question}" data-required="${q.required}">`;
-      h += `<b>${q.question}</b> ${requiredMarker}<br>`;
+      let block = document.createElement('div');
+      block.className = "question-block";
+      block.id = "qblock-" + q.id;
+      block.dataset.id = q.id; block.dataset.type = q.type; block.dataset.text = q.question; block.dataset.required = q.required;
 
-      if (q.desc) {
-        h += `<p class="question-desc">${q.desc}</p>`;
-      }
-      if (q.image) {
-        h += `<img src="${q.image}" class="question-image" style="max-width:100%;"><br>`;
-      }
+      let h = `<b>Câu ${i+1}: ${q.question}</b> ${requiredMarker}
+               <label class="flag-label"><input type="checkbox" onchange="toggleFlag('${q.id}', this.checked)"> Cắm cờ xem lại</label><br>`;
+
+      if (q.desc) h += `<p class="question-desc">${q.desc}</p>`;
+      if (q.image) h += `<img src="${q.image}" class="question-image" style="max-width:100%;"><br>`;
 
       if(q.type === 'MULTIPLE_CHOICE' || q.type === 'SCALE') {
-        q.options.forEach(o => h += `<label class="option-label"><input type="radio" name="q${i}" value="${o}"> ${o}</label>`);
+        q.options.forEach(o => h += `<label class="option-label"><input type="radio" name="q${i}" value="${o}" onchange="markAnswered('${q.id}')"> ${o}</label>`);
       } else if(q.type === 'CHECKBOX') {
-        q.options.forEach(o => h += `<label class="option-label"><input type="checkbox" name="q${i}" value="${o}"> ${o}</label>`);
+        q.options.forEach(o => h += `<label class="option-label"><input type="checkbox" name="q${i}" value="${o}" onchange="markAnswered('${q.id}')"> ${o}</label>`);
       } else if(q.type === 'PARAGRAPH') {
-        h += `<textarea name="q${i}" rows="4"></textarea>`;
+        h += `<textarea name="q${i}" rows="4" oninput="markAnswered('${q.id}')"></textarea>`;
       } else if(q.type === 'DROPDOWN') {
-        h += `<select name="q${i}"><option value="">-- Chọn --</option>`;
+        h += `<select name="q${i}" onchange="markAnswered('${q.id}')"><option value="">-- Chọn --</option>`;
         q.options.forEach(o => h += `<option value="${o}">${o}</option>`);
         h += `</select>`;
       }
-      cont.innerHTML += h + `</div>`;
+      block.innerHTML = h;
+      currentGroupDiv.appendChild(block);
     });
+
+    showPage(0);
   }
 
-  function startTimer(min) {
-    totalTime = min * 60;
-    timeRemaining = totalTime;
+  function markAnswered(qId) {
+    const box = document.getElementById('pbox-' + qId);
+    if(box) box.classList.add('answered');
+  }
+
+  function toggleFlag(qId, isFlagged) {
+    const box = document.getElementById('pbox-' + qId);
+    if(box) {
+      if(isFlagged) box.classList.add('flagged');
+      else box.classList.remove('flagged');
+    }
+  }
+
+  function jumpToQuestion(qId, pageIndex) {
+    showPage(pageIndex);
+    setTimeout(() => {
+      document.getElementById('qblock-' + qId).scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  }
+
+  function showPage(index) {
+    pages.forEach(p => p.classList.remove('active'));
+    pages[index].classList.add('active');
+    currentPageIndex = index;
+
+    document.getElementById('prev-btn').style.display = index === 0 ? 'none' : 'inline-block';
+
+    if (index === pages.length - 1) {
+      document.getElementById('next-btn').style.display = 'none';
+      document.getElementById('finish-btn').style.display = 'inline-block';
+    } else {
+      document.getElementById('next-btn').style.display = 'inline-block';
+      document.getElementById('finish-btn').style.display = 'none';
+    }
+  }
+
+  function prevPage() { if (currentPageIndex > 0) showPage(currentPageIndex - 1); }
+  function nextPage() { if (currentPageIndex < pages.length - 1) showPage(currentPageIndex + 1); }
+
+  function startTimer() {
     timerInterval = setInterval(() => {
       timeRemaining--;
       let m = Math.floor(timeRemaining / 60), s = timeRemaining % 60;
@@ -80,8 +205,36 @@
 
   function startAutoSave() {
     autoSaveInterval = setInterval(() => {
-      google.script.run.saveProgress(testData.candidateInfo.email, getAnswers());
+      const answers = getAnswers();
+      const state = { email: testData.candidateInfo.email, testData: testData, timeRemaining: timeRemaining, totalTime: totalTime, answers: answers };
+      localStorage.setItem('testState', JSON.stringify(state));
+      google.script.run.saveProgress(testData.candidateInfo.email, answers);
     }, 5000);
+  }
+
+  function restoreAnswers(answers) {
+    answers.forEach(ans => {
+      if(!ans.answer) return;
+      const block = document.querySelector(`.question-block[data-id="${ans.id}"]`);
+      if(!block) return;
+
+      const type = block.dataset.type;
+      if (type === 'MULTIPLE_CHOICE' || type === 'SCALE') {
+        const inp = block.querySelector(`input[value="${ans.answer}"]`);
+        if(inp) inp.checked = true;
+      } else if (type === 'CHECKBOX') {
+        const vals = ans.answer.split(', ');
+        vals.forEach(v => {
+          const inp = block.querySelector(`input[value="${v}"]`);
+          if(inp) inp.checked = true;
+        });
+      } else if (type === 'PARAGRAPH') {
+        block.querySelector('textarea').value = ans.answer;
+      } else if (type === 'DROPDOWN') {
+        block.querySelector('select').value = ans.answer;
+      }
+      markAnswered(ans.id);
+    });
   }
 
   document.getElementById('finish-btn').onclick = () => {
@@ -118,12 +271,35 @@
   function sendFinalData() {
     clearInterval(timerInterval);
     clearInterval(autoSaveInterval);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+
     const answers = getAnswers();
     let timeTaken = totalTime - timeRemaining;
+
+    // Clear local storage on submit
+    localStorage.removeItem('testState');
+
+    const payload = { candidateInfo: testData.candidateInfo, answers: answers, timeTaken: timeTaken };
+
+    // Offline Tolerance Handler
+    if (!navigator.onLine) {
+      alert("Bạn đang mất kết nối mạng. Bài thi đã được lưu trên máy. Đừng đóng trang này, hệ thống sẽ tự nộp khi có mạng lại.");
+      window.addEventListener('online', () => submitPayload(payload));
+    } else {
+      submitPayload(payload);
+    }
+  }
+
+  function submitPayload(payload) {
+    document.getElementById('test-screen').style.display = 'none';
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('loading').innerText = 'Đang nộp bài...';
     google.script.run.withSuccessHandler(m => {
-      document.getElementById('test-screen').style.display = 'none';
+      document.getElementById('loading').style.display = 'none';
       document.getElementById('result-screen').style.display = 'block';
       document.getElementById('result-msg').textContent = m;
-    }).processResults({ candidateInfo: testData.candidateInfo, answers: answers, timeTaken: timeTaken });
+    }).withFailureHandler(err => {
+      alert("Có lỗi xảy ra khi nộp bài: " + err.message);
+    }).processResults(payload);
   }
 </script>

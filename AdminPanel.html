@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <title>Admin Panel</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f7f6; padding: 20px; font-size: 14px; display: flex; }
+    .sidebar { width: 250px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); height: calc(100vh - 80px); position: sticky; top: 20px; }
+    .sidebar h2 { font-size: 18px; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-top: 0;}
+    .sidebar button { display: block; width: 100%; padding: 12px; margin-bottom: 10px; background: none; border: none; text-align: left; cursor: pointer; font-size: 15px; border-radius: 4px; transition: 0.3s; }
+    .sidebar button:hover { background: #ecf0f1; }
+    .sidebar button.active { background: #3498db; color: white; font-weight: bold; }
+
+    .content { flex-grow: 1; margin-left: 20px; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); min-height: calc(100vh - 100px); }
+    .content h2 { font-size: 22px; color: #2c3e50; margin-top: 0; }
+    .tabcontent { display: none; }
+
+    input[type="text"], input[type="email"], input[type="number"], select, textarea { width: 100%; padding: 10px; margin: 8px 0 15px 0; display: inline-block; border: 1px solid #ccc; box-sizing: border-box; border-radius: 4px; }
+    button.action-btn { background-color: #3498db; color: white; padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+    button.action-btn:hover { background-color: #2980b9; }
+
+    .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); margin-bottom: 20px; border: 1px solid #eee; }
+    .disc-box { padding: 15px; background: #e8f4f8; border-left: 4px solid #3498db; margin-top: 10px; }
+
+    table.data-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    table.data-table th, table.data-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+    table.data-table th { background-color: #f8f9fa; }
+
+    .loader { color: #f39c12; font-style: italic; display: none; margin-top: 10px; }
+
+    /* Configs Vertical Layout */
+    .config-group { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+    .config-col { flex: 1; min-width: 200px; background: #f9f9f9; padding: 15px; border-radius: 4px; }
+    .config-col h4 { margin-top: 0; border-bottom: 1px solid #ddd; padding-bottom: 5px; color: #e67e22; }
+    .config-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .config-item input { width: 60px; margin: 0; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- jsPDF for exporting -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+  <div class="sidebar">
+    <h2>Admin Panel</h2>
+    <button class="tablinks active" onclick="openTab(event, 'General')">Chung & Cài đặt</button>
+    <button class="tablinks" onclick="openTab(event, 'Configs')">Cấu hình Đề thi</button>
+    <button class="tablinks" onclick="openTab(event, 'Assignments')">Chỉ định Câu hỏi</button>
+    <button class="tablinks" onclick="openTab(event, 'Report')">Báo cáo & Chấm điểm</button>
+    <button class="tablinks" onclick="openTab(event, 'BulkExport')">Xuất báo cáo hàng loạt</button>
+  </div>
+
+  <div class="content">
+
+    <!-- GENERAL TAB -->
+    <div id="General" class="tabcontent" style="display:block;">
+      <h2>Chung & Cài đặt Hệ thống</h2>
+      <div class="card">
+        <h3>Link Hệ thống</h3>
+        <p>Copy link dưới đây để gửi cho ứng viên.</p>
+        <button class="action-btn" onclick="copyLink()">Copy Link Bài Test</button>
+      </div>
+
+      <div class="card">
+        <h3>Cài đặt Giao diện & Chống gian lận</h3>
+        <label>URL Logo Công ty (để trống nếu không dùng):</label>
+        <input type="text" id="setLogo" placeholder="https://example.com/logo.png">
+
+        <label>Bật tính năng chống chuyển Tab (Anti-cheat):</label>
+        <select id="setAntiCheat">
+          <option value="TRUE">Bật (Khóa bài nếu vi phạm quá số lần)</option>
+          <option value="FALSE">Tắt</option>
+        </select>
+
+        <label>Số lần vi phạm tối đa cho phép (nếu bật Anti-cheat):</label>
+        <input type="number" id="setAntiCheatMax" value="3">
+
+        <button class="action-btn" onclick="saveSettings()">Lưu Cài đặt</button>
+        <div id="loadingSettings" class="loader">Đang lưu...</div>
+      </div>
+    </div>
+
+    <!-- CONFIGS TAB -->
+    <div id="Configs" class="tabcontent">
+      <h2>Cấu hình Số lượng Câu hỏi</h2>
+      <p style="color: #555;">Chọn Vị trí (Position) để chỉnh sửa số lượng câu hỏi theo độ khó. Hệ thống sẽ tự động chọn ngẫu nhiên trong ngân hàng câu hỏi (QUESTIONBANK).</p>
+
+      <label>Chọn Vị trí đã có:</label>
+      <div style="display:flex; gap:10px;">
+        <select id="configPositionSelect" onchange="loadPositionConfig()"></select>
+        <button class="action-btn" style="width: auto; background: #e67e22;" onclick="loadPositionConfig()">Tải Cấu Hình</button>
+        <button class="action-btn" style="width: auto; background: #2ecc71;" onclick="addNewPosition()">Thêm Vị trí Mới</button>
+      </div>
+      <div id="loadingConfig" class="loader">Đang tải...</div>
+
+      <div id="configEditor" style="display:none; margin-top: 30px;">
+        <h3 id="editingPositionName" style="color: #3498db;"></h3>
+        <label>Thời gian làm bài (Phút):</label>
+        <input type="number" id="cfgDuration" style="width: 100px;">
+
+        <div id="configGroups" class="config-group"></div>
+
+        <button class="action-btn" onclick="saveConfigs()">Lưu thay đổi Cấu hình</button>
+      </div>
+    </div>
+
+    <!-- ASSIGNMENTS TAB -->
+    <div id="Assignments" class="tabcontent">
+      <h2>Chỉ định Câu hỏi Đặc biệt</h2>
+      <p style="color: #555;">Dán các ID câu hỏi (cách nhau bởi dấu cách). Ứng viên thuộc đối tượng này sẽ làm ĐÚNG bộ đề này thay vì lấy ngẫu nhiên.</p>
+      <div class="card">
+        <label>Loại chỉ định:</label>
+        <select id="assignType">
+          <option value="Position">Theo Vị trí (Position)</option>
+          <option value="Email">Theo Email Ứng viên</option>
+          <option value="Phone">Theo Số điện thoại</option>
+        </select>
+
+        <label>Giá trị (Nhập đúng Email, SĐT, hoặc Tên vị trí):</label>
+        <input type="text" id="assignValue" placeholder="vd: ungvien@mail.com hoặc Staff">
+
+        <label>Danh sách ID (cách nhau bởi dấu cách):</label>
+        <textarea id="assignIds" rows="5" placeholder="vd: IQ001 IQ002 PS001 PER001"></textarea>
+
+        <button class="action-btn" onclick="assignQuestions()">Lưu Chỉ Định</button>
+        <div id="loadingAssign" class="loader">Đang lưu...</div>
+      </div>
+    </div>
+
+    <!-- REPORT TAB -->
+    <div id="Report" class="tabcontent">
+      <h2>Tra cứu & Chấm điểm Tự luận</h2>
+      <div style="display:flex; gap: 10px;">
+        <input type="email" id="searchEmail" placeholder="Nhập email ứng viên">
+        <button class="action-btn" style="width: 120px;" onclick="fetchReport()">Tra cứu</button>
+      </div>
+      <div id="loadingReport" class="loader">Đang tải...</div>
+
+      <div id="reportContainer" style="display:none; margin-top: 20px;">
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+          <div class="card" style="flex: 1; min-width: 300px;">
+            <h3>Tổng quan</h3>
+            <p><b>Tổng điểm:</b> <span id="rTotal" style="font-size: 24px; color: #e74c3c; font-weight: bold;"></span></p>
+            <p><b>Thời gian làm bài:</b> <span id="rTime"></span> giây</p>
+
+            <h3 style="margin-top: 20px;">Hồ sơ DISC</h3>
+            <div class="disc-box">
+              <h4 id="rDisc" style="margin-top:0; font-size: 20px;"></h4>
+              <p style="margin-bottom:0; font-size:12px; color:#555;">D - Quyết đoán | I - Giao tiếp | S - Kiên định | C - Logic</p>
+            </div>
+          </div>
+
+          <div class="card" style="flex: 1; min-width: 300px;">
+            <h3>Biểu đồ năng lực</h3>
+            <canvas id="radarChart"></canvas>
+          </div>
+        </div>
+
+        <div id="paragraphContainer" class="card">
+          <h3>Chấm điểm Tự luận (PARAGRAPH)</h3>
+          <p style="font-size:12px; color:#7f8c8d;">Nhập điểm và bấm Lưu để hệ thống cập nhật lại Tổng điểm.</p>
+          <div id="paraList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BULK EXPORT TAB -->
+    <div id="BulkExport" class="tabcontent">
+      <h2>Xuất Báo cáo Hàng loạt (PDF)</h2>
+      <p style="color: #555;">Chọn các ứng viên từ danh sách để xuất báo cáo Radar Chart & DISC thành 1 file PDF.</p>
+
+      <button class="action-btn" style="background:#e67e22; width: auto; margin-bottom: 15px;" onclick="loadCandidates()">Tải Danh sách Ứng viên</button>
+      <div id="loadingCandidates" class="loader">Đang tải danh sách...</div>
+
+      <div id="candidatesListContainer" style="display:none;">
+        <table class="data-table" id="candidatesTable">
+          <thead>
+            <tr>
+              <th style="width: 50px;"><input type="checkbox" id="checkAll" onclick="toggleAll(this)"></th>
+              <th>Thời gian nộp</th>
+              <th>Họ Tên</th>
+              <th>Email</th>
+              <th>Vị trí</th>
+              <th>Tổng điểm</th>
+            </tr>
+          </thead>
+          <tbody id="candidatesTbody"></tbody>
+        </table>
+
+        <button class="action-btn" style="background:#2ecc71;" onclick="exportBulkPDF()">Xuất PDF các Ứng viên đã chọn</button>
+        <div id="loadingExport" class="loader">Đang tạo PDF, vui lòng đợi...</div>
+      </div>
+    </div>
+
+  </div> <!-- End Content -->
+
+  <script>
+    // --- UTILS & NAVIGATION ---
+    let currentConfigData = { headers: [], data: [] };
+    let myRadarChart = null;
+
+    function openTab(evt, tabName) {
+      const tabcontent = document.getElementsByClassName("tabcontent");
+      for (let i = 0; i < tabcontent.length; i++) tabcontent[i].style.display = "none";
+      const tablinks = document.getElementsByClassName("tablinks");
+      for (let i = 0; i < tablinks.length; i++) tablinks[i].className = tablinks[i].className.replace(" active", "");
+      document.getElementById(tabName).style.display = "block";
+      evt.currentTarget.className += " active";
+
+      if (tabName === 'General') loadSettings();
+      if (tabName === 'Configs' && currentConfigData.headers.length === 0) fetchAllConfigs();
+    }
+
+    // --- GENERAL TAB ---
+    function copyLink() {
+      google.script.run.withSuccessHandler(url => {
+        navigator.clipboard.writeText(url).then(() => alert('Đã copy link: ' + url))
+          .catch(err => prompt("Copy link bên dưới:", url));
+      }).getWebAppUrl();
+    }
+
+    function loadSettings() {
+      google.script.run.withSuccessHandler(settings => {
+        document.getElementById('setLogo').value = settings['Logo_URL'] || '';
+        document.getElementById('setAntiCheat').value = settings['Anti_Cheat_Enabled'] || 'TRUE';
+        document.getElementById('setAntiCheatMax').value = settings['Anti_Cheat_Max_Violations'] || '3';
+      }).getSystemSettings();
+    }
+
+    function saveSettings() {
+      const obj = {
+        'Logo_URL': document.getElementById('setLogo').value.trim(),
+        'Anti_Cheat_Enabled': document.getElementById('setAntiCheat').value,
+        'Anti_Cheat_Max_Violations': document.getElementById('setAntiCheatMax').value
+      };
+      document.getElementById('loadingSettings').style.display = 'block';
+      google.script.run.withSuccessHandler(msg => {
+        document.getElementById('loadingSettings').style.display = 'none';
+        alert(msg);
+      }).saveSystemSettings(obj);
+    }
+
+    // --- CONFIGS TAB (VERTICAL LAYOUT) ---
+    function fetchAllConfigs() {
+      document.getElementById('loadingConfig').style.display = 'block';
+      google.script.run.withSuccessHandler(res => {
+        document.getElementById('loadingConfig').style.display = 'none';
+        if (!res || !res.headers || res.headers.length === 0) return;
+        currentConfigData = res;
+
+        const sel = document.getElementById('configPositionSelect');
+        sel.innerHTML = "";
+        res.data.forEach(row => {
+          let opt = document.createElement('option');
+          opt.value = row[0]; opt.text = row[0];
+          sel.appendChild(opt);
+        });
+        if (res.data.length > 0) loadPositionConfig();
+      }).getConfigData();
+    }
+
+    function loadPositionConfig() {
+      const posName = document.getElementById('configPositionSelect').value;
+      const row = currentConfigData.data.find(r => r[0] === posName);
+      if(!row) return;
+
+      document.getElementById('configEditor').style.display = 'block';
+      document.getElementById('editingPositionName').innerText = "Vị trí: " + posName;
+
+      const durIdx = currentConfigData.headers.indexOf('Duration_Minutes');
+      document.getElementById('cfgDuration').value = row[durIdx];
+
+      // Group headers by category
+      let groups = {};
+      currentConfigData.headers.forEach((h, i) => {
+        if (h.endsWith('_Count')) {
+          const parts = h.replace('_Count', '').split('_');
+          let cat = parts[0];
+          let diff = "ANY";
+          if (parts.length >= 2 && !isNaN(parts[parts.length - 1])) {
+            diff = parts.pop();
+            cat = parts.join('_');
+          } else if (parts.length > 1) {
+            cat = parts.join('_');
+          }
+          if(!groups[cat]) groups[cat] = [];
+          groups[cat].push({ index: i, header: h, diff: diff, value: row[i] });
+        }
+      });
+
+      const grpContainer = document.getElementById('configGroups');
+      grpContainer.innerHTML = "";
+
+      for(let cat in groups) {
+        let col = `<div class="config-col"><h4>Phần: ${cat}</h4>`;
+        groups[cat].forEach(item => {
+          let label = item.diff === "ANY" ? "Bất kỳ độ khó" : `Độ khó ${item.diff}`;
+          col += `<div class="config-item"><span>${label}:</span> <input type="number" id="cfgInp_${item.index}" value="${item.value}"></div>`;
+        });
+        col += `</div>`;
+        grpContainer.innerHTML += col;
+      }
+    }
+
+    function addNewPosition() {
+      let name = prompt("Nhập tên vị trí mới:");
+      if (!name) return;
+      let newRow = new Array(currentConfigData.headers.length).fill(0);
+      newRow[0] = name;
+      newRow[currentConfigData.headers.indexOf('Duration_Minutes')] = 30; // default
+      currentConfigData.data.push(newRow);
+
+      let opt = document.createElement('option');
+      opt.value = name; opt.text = name;
+      document.getElementById('configPositionSelect').appendChild(opt);
+      document.getElementById('configPositionSelect').value = name;
+      loadPositionConfig();
+    }
+
+    function saveConfigs() {
+      const posName = document.getElementById('configPositionSelect').value;
+      const rowIndex = currentConfigData.data.findIndex(r => r[0] === posName);
+      if (rowIndex === -1) return;
+
+      currentConfigData.data[rowIndex][currentConfigData.headers.indexOf('Duration_Minutes')] = document.getElementById('cfgDuration').value;
+
+      currentConfigData.headers.forEach((h, i) => {
+        if (h.endsWith('_Count')) {
+          const inp = document.getElementById(`cfgInp_${i}`);
+          if(inp) currentConfigData.data[rowIndex][i] = Number(inp.value) || 0;
+        }
+      });
+
+      let payload = [currentConfigData.headers].concat(currentConfigData.data);
+
+      document.getElementById('loadingConfig').style.display = 'block';
+      google.script.run.withSuccessHandler(msg => {
+        document.getElementById('loadingConfig').style.display = 'none';
+        alert(msg);
+      }).updateConfigData(payload);
+    }
+
+    // --- ASSIGNMENTS TAB ---
+    function assignQuestions() {
+      const type = document.getElementById('assignType').value;
+      const val = document.getElementById('assignValue').value.trim();
+      const ids = document.getElementById('assignIds').value.trim();
+      if (!val || !ids) return alert("Vui lòng nhập Giá trị và danh sách ID.");
+
+      document.getElementById('loadingAssign').style.display = 'block';
+      google.script.run.withSuccessHandler(msg => {
+        document.getElementById('loadingAssign').style.display = 'none';
+        alert(msg);
+      }).assignQuestionsToCandidate(type, val, ids);
+    }
+
+    // --- REPORT TAB ---
+    function fetchReport() {
+      const email = document.getElementById('searchEmail').value.trim();
+      if (!email) return alert('Nhập email!');
+      document.getElementById('loadingReport').style.display = 'block';
+      document.getElementById('reportContainer').style.display = 'none';
+
+      google.script.run.withSuccessHandler(data => {
+        document.getElementById('loadingReport').style.display = 'none';
+        if (!data) return alert('Không tìm thấy dữ liệu.');
+
+        document.getElementById('reportContainer').style.display = 'block';
+        document.getElementById('rTotal').innerText = data.totalScore;
+        document.getElementById('rTime').innerText = data.timeTaken;
+        document.getElementById('rDisc').innerText = "Profile: " + (data.discProfile || "Chưa có");
+
+        renderChart(data.catScores, 'radarChart');
+        renderParagraphs(data.paragraphAnswers, data.email);
+      }).getCandidateReport(email);
+    }
+
+    function renderChart(scores, canvasId) {
+      const ctx = document.getElementById(canvasId).getContext('2d');
+      const labels = Object.keys(scores);
+      const dataPoints = Object.values(scores);
+
+      if (myRadarChart && canvasId === 'radarChart') myRadarChart.destroy();
+
+      let chart = new Chart(ctx, {
+        type: 'radar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Điểm số',
+            data: dataPoints,
+            backgroundColor: 'rgba(52, 152, 219, 0.2)',
+            borderColor: 'rgba(52, 152, 219, 1)',
+            pointBackgroundColor: 'rgba(52, 152, 219, 1)'
+          }]
+        },
+        options: { scales: { r: { beginAtZero: true } } }
+      });
+      if (canvasId === 'radarChart') myRadarChart = chart;
+      return chart;
+    }
+
+    function escapeHtml(unsafe) {
+      return (unsafe || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    function renderParagraphs(paras, email) {
+      const list = document.getElementById('paraList');
+      list.innerHTML = "";
+      if (paras.length === 0) {
+        list.innerHTML = "<p>Không có câu tự luận.</p>";
+        return;
+      }
+      paras.forEach(p => {
+        let div = document.createElement('div');
+        div.style.marginBottom = "15px"; div.style.paddingBottom = "10px"; div.style.borderBottom = "1px dashed #ccc";
+
+        let safeAnswer = escapeHtml(p.answer);
+
+        div.innerHTML = `
+          <strong>${escapeHtml(p.question)}</strong>
+          <p style="background:#f9f9f9; padding:8px; border-radius:4px; font-size:13px;">${safeAnswer}</p>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <input type="number" id="score_${p.id}" value="${p.currentScore}" style="width:70px;">
+            <button onclick="updateScore('${email}', '${p.id}')" class="action-btn" style="width:auto; padding: 8px;">Lưu điểm</button>
+          </div>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function updateScore(email, qId) {
+      const newScore = document.getElementById(`score_${qId}`).value;
+      google.script.run.withSuccessHandler(() => {
+        alert("Đã cập nhật điểm! Vui lòng tra cứu lại để xem tổng điểm mới.");
+      }).updateParagraphScore(email, qId, newScore);
+    }
+
+    // --- BULK EXPORT TAB ---
+    function loadCandidates() {
+      document.getElementById('loadingCandidates').style.display = 'block';
+      google.script.run.withSuccessHandler(list => {
+        document.getElementById('loadingCandidates').style.display = 'none';
+        const tbody = document.getElementById('candidatesTbody');
+        tbody.innerHTML = "";
+        list.forEach(c => {
+          let tr = `<tr>
+            <td style="text-align:center;"><input type="checkbox" class="cand-chk" value="${c.email}"></td>
+            <td>${new Date(c.timestamp).toLocaleString()}</td>
+            <td>${c.fullName}</td>
+            <td>${c.email}</td>
+            <td>${c.position}</td>
+            <td>${c.totalScore}</td>
+          </tr>`;
+          tbody.innerHTML += tr;
+        });
+        document.getElementById('candidatesListContainer').style.display = 'block';
+      }).getCandidatesList();
+    }
+
+    function toggleAll(source) {
+      const checkboxes = document.querySelectorAll('.cand-chk');
+      checkboxes.forEach(chk => chk.checked = source.checked);
+    }
+
+    function exportBulkPDF() {
+      const checked = Array.from(document.querySelectorAll('.cand-chk:checked')).map(chk => chk.value);
+      if (checked.length === 0) return alert("Chọn ít nhất 1 ứng viên!");
+
+      document.getElementById('loadingExport').style.display = 'block';
+      google.script.run.withSuccessHandler(reports => {
+        generatePDF(reports);
+      }).getBulkReports(checked);
+    }
+
+    function generatePDF(reports) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      reports.forEach((rep, index) => {
+        if (index > 0) doc.addPage();
+
+        doc.setFontSize(18);
+        doc.text("Báo cáo Kết quả Tuyển dụng", 105, 20, null, null, "center");
+
+        doc.setFontSize(12);
+        doc.text(`Họ tên: ${rep.fullName}`, 20, 40);
+        doc.text(`Email: ${rep.email}`, 20, 50);
+        doc.text(`Tổng điểm: ${rep.totalScore}`, 20, 60);
+        doc.text(`Thời gian làm bài: ${rep.timeTaken}s`, 20, 70);
+        doc.text(`DISC Profile: ${rep.discProfile || 'N/A'}`, 20, 80);
+
+        doc.text("Điểm theo từng phần:", 20, 100);
+        let y = 110;
+        for (let cat in rep.catScores) {
+          doc.text(`- ${cat}: ${rep.catScores[cat]}`, 25, y);
+          y += 10;
+        }
+      });
+
+      document.getElementById('loadingExport').style.display = 'none';
+      doc.save("Bao_Cao_Ung_Vien.pdf");
+    }
+
+    // Init load settings on start
+    window.onload = loadSettings;
+  </script>
+</body>
+</html>
