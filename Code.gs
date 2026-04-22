@@ -14,7 +14,43 @@ function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('Hệ thống Test')
     .addItem('Khởi tạo hệ thống', 'initSystem')
+    .addItem('Xuất kết quả ứng viên', 'showExportPrompt')
     .addToUi();
+}
+
+function showExportPrompt() {
+  const html = HtmlService.createHtmlOutputFromFile('ExportModal')
+      .setWidth(600)
+      .setHeight(500);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Xuất kết quả bài Test');
+}
+
+function generateExportData(email) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const qbData = ss.getSheetByName('QUESTIONBANK').getDataRange().getValues();
+  const ansData = ss.getSheetByName('ANSWERS').getDataRange().getValues();
+
+  // Filter answers by email
+  const candidateAnswers = ansData.filter(r => r[1] === email);
+  if (candidateAnswers.length === 0) return "Không tìm thấy dữ liệu cho email này.";
+
+  let output = `KẾT QUẢ BÀI TEST - Ứng viên: ${email}\n==============================================\n\n`;
+
+  candidateAnswers.forEach(ans => {
+    const qID = ans[2];
+    const candidateAnswer = ans[4];
+    const isCorrect = ans[5];
+    const qData = qbData.find(q => q[0] === qID);
+
+    if (qData) {
+      output += `[${qData[1]}] Câu hỏi: ${qData[6]}\n`;
+      output += `- Ứng viên chọn: ${candidateAnswer}\n`;
+      output += `- Đáp án đúng của hệ thống: ${qData[17]}\n`;
+      output += `- Kết quả chấm tự động: ${isCorrect ? 'ĐÚNG' : 'SAI'}\n\n`;
+    }
+  });
+
+  return output;
 }
 
 function include(filename) {
@@ -42,9 +78,9 @@ function initSystem() {
   let configSheet = ss.getSheetByName('CONFIG');
   if (!configSheet) {
     configSheet = ss.insertSheet('CONFIG');
-    const headers = ['Position', 'IQ_Count', 'EQ_Count', 'Problem_Solving_Count', 'Leadership_Count', 'Personality_Count', 'Duration_Minutes'];
+    const headers = ['Position', 'IQ_1_Count', 'IQ_2_Count', 'IQ_3_Count', 'EQ_1_Count', 'EQ_2_Count', 'EQ_3_Count', 'Problem_Solving_1_Count', 'Problem_Solving_2_Count', 'Problem_Solving_3_Count', 'Leadership_1_Count', 'Leadership_2_Count', 'Leadership_3_Count', 'Personality_1_Count', 'Duration_Minutes'];
     configSheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
-    configSheet.appendRow(['Staff', 5, 5, 5, 5, 5, 30]);
+    configSheet.appendRow(['Staff', 2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 1, 5, 30]);
   }
 
   if (!ss.getSheetByName('ANSWERS')) {
@@ -96,12 +132,24 @@ function generateTest(candidateInfo) {
   const config = configData.find(r => r[0] === candidateInfo.position);
   if (!config) throw new Error("Không tìm thấy cấu hình.");
 
-  const counts = {};
+  const diffCounts = {}; // e.g. { "IQ": { "1": 2, "2": 2, "3": 1 }, "Personality": { "ANY": 5 } }
   for (let i = 1; i < configHeaders.length; i++) {
     const h = configHeaders[i];
     if (h.endsWith('_Count')) {
-      const cat = h.replace('_Count', '');
-      counts[cat] = config[i];
+      const parts = h.replace('_Count', '').split('_');
+      let cat = parts[0];
+      let diff = "ANY";
+
+      // Handle categories with multiple underscores (like Problem_Solving)
+      if (parts.length >= 2 && !isNaN(parts[parts.length - 1])) {
+        diff = parts.pop();
+        cat = parts.join('_');
+      } else if (parts.length > 1) {
+        cat = parts.join('_');
+      }
+
+      if (!diffCounts[cat]) diffCounts[cat] = {};
+      diffCounts[cat][diff] = Number(config[i]) || 0;
     }
   }
 
@@ -113,17 +161,28 @@ function generateTest(candidateInfo) {
   });
 
   const testQuestions = [];
-  for (let cat in counts) {
-    let pool = activeQ.filter(q => q[headers.indexOf('Category')] === cat).sort(() => Math.random() - 0.5);
-    testQuestions.push(...pool.slice(0, counts[cat] || 0));
+  for (let cat in diffCounts) {
+    for (let diff in diffCounts[cat]) {
+      let countNeeded = diffCounts[cat][diff];
+      if (countNeeded <= 0) continue;
+
+      let pool = activeQ.filter(q => {
+        let matchCat = q[headers.indexOf('Category')] === cat;
+        if (!matchCat) return false;
+        if (diff === "ANY") return true;
+        return String(q[headers.indexOf('Difficulty')]) === diff;
+      }).sort(() => Math.random() - 0.5);
+
+      testQuestions.push(...pool.slice(0, countNeeded));
+    }
   }
 
   return {
     questions: testQuestions.map(q => ({
-      id: q[0], question: q[6], desc: q[7], image: q[8], type: q[9], required: q[10],
+      id: q[0], category: q[1], question: q[6], desc: q[7], image: q[8], type: q[9], required: q[10],
       options: [q[11], q[12], q[13], q[14], q[15]].filter(o => o !== ""), points: q[16]
     })),
-    duration: config[6],
+    duration: config[configHeaders.indexOf('Duration_Minutes')],
     candidateInfo: candidateInfo
   };
 }

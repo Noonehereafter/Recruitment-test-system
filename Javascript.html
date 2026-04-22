@@ -20,7 +20,14 @@
 
   function renderTest() {
     const cont = document.getElementById('questions-container');
+    let currentCategory = "";
+
     testData.questions.forEach((q, i) => {
+      if (q.category && q.category !== currentCategory) {
+        currentCategory = q.category;
+        cont.innerHTML += `<h3 style="margin-top: 30px; border-bottom: 2px solid #3498db; padding-bottom: 5px; color: #2c3e50;">Phần: ${currentCategory}</h3>`;
+      }
+
       const requiredMarker = (q.required === true || q.required === "TRUE" || q.required === "true") ? `<span style="color:red;">*</span>` : "";
       let h = `<div class="question-block" data-id="${q.id}" data-type="${q.type}" data-text="${q.question}" data-required="${q.required}">`;
       h += `<b>${q.question}</b> ${requiredMarker}<br>`;
