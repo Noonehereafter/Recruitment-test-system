@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('CSS'); ?>
+</head>
+<body>
+  <div class="container">
+    <div id="registration-screen">
+      <h2>Hệ thống Test Tuyển dụng</h2>
+      <form id="reg-form">
+        <input type="text" id="fullName" placeholder="Họ và Tên" required><br><br>
+        <input type="email" id="email" placeholder="Email" required><br><br>
+        <input type="tel" id="phone" placeholder="Số điện thoại" required><br><br>
+        <select id="position" required><option value="">-- Chọn vị trí --</option></select><br><br>
+        <button type="submit">Bắt đầu bài Test</button>
+      </form>
+    </div>
+    <div id="test-screen" style="display:none">
+      <div id="timer-container">Thời gian: <span id="timer"></span></div>
+      <div id="questions-container"></div>
+      <button id="finish-btn">Nộp bài</button>
+    </div>
+    <div id="result-screen" style="display:none"><h2 id="result-msg"></h2></div>
+    <div id="loading" style="display:none">Đang xử lý...</div>
+  </div>
+  <?!= include('Javascript'); ?>
+</body>
+</html>
