@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #4F46E5;
+      --primary-hover: #4338CA;
+      --bg: #F9FAFB;
+      --surface: #FFFFFF;
+      --text: #111827;
+      --text-muted: #6B7280;
+      --border: #E5E7EB;
+      --radius: 12px;
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); padding: 20px; font-size: 14px; margin: 0; }
+    h2 { font-size: 18px; color: var(--text); font-weight: 700; margin-top: 0; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;}
+    h2::before { content: ''; display: inline-block; width: 4px; height: 18px; background: var(--primary); border-radius: 4px; }
+    
+    .tab { display: flex; gap: 8px; background: #E5E7EB; padding: 6px; border-radius: 14px; margin-bottom: 24px; }
+    .tab button { 
+      flex: 1; background: transparent; border: none; padding: 12px; border-radius: 10px; 
+      cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; color: var(--text-muted); 
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); font-size: 14px;
+    }
+    .tab button:hover { color: var(--text); background: rgba(255,255,255,0.3); }
+    .tab button.active { background: var(--surface); color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    
+    .tabcontent { display: none; animation: fadeIn 0.4s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    
+    input[type="email"], input[type="number"], input[type="text"] { 
+      width: 100%; padding: 14px 16px; margin: 8px 0 20px; border: 1.5px solid var(--border); 
+      border-radius: 12px; box-sizing: border-box; font-family: 'Outfit', sans-serif; outline: none; transition: 0.3s;
+      background: var(--surface);
+    }
+    input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15); }
+    
+    button.action-btn { 
+      background: var(--primary); color: white; padding: 14px; border: none; 
+      border-radius: 12px; cursor: pointer; width: 100%; font-weight: 600; font-family: 'Outfit', sans-serif; 
+      transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25); font-size: 15px;
+    }
+    button.action-btn:hover { background: var(--primary-hover); transform: translateY(-2px); box-shadow: 0 6px 16px rgba(79, 70, 229, 0.3); }
+    button.action-btn:active { transform: translateY(0); }
+    
+    .card { background: var(--surface); padding: 20px; border-radius: 16px; box-shadow: var(--shadow); margin-bottom: 20px; border: 1px solid var(--border); transition: transform 0.2s;}
+    .card:hover { transform: translateY(-2px); border-color: #D1D5DB; }
+    .card h3 { margin-top: 0; font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px; color: var(--text); }
+    
+    #loading { color: var(--primary); font-size: 14px; font-weight: 500; display: none; text-align: center; margin: 15px 0; }
+    
+    .disc-box { padding: 16px; background: rgba(79, 70, 229, 0.04); border-left: 4px solid var(--primary); border-radius: 0 12px 12px 0; }
+    .disc-box h4 { margin: 0 0 10px 0; color: var(--primary); font-size: 18px; font-weight: 700; }
+    .disc-box p { margin: 0; font-size: 13.5px; color: var(--text-muted); line-height: 1.6; }
+    
+    .stat-row { display: flex; justify-content: space-between; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed var(--border); }
+    .stat-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .stat-label { color: var(--text-muted); font-weight: 500;}
+    .stat-value { font-weight: 700; color: var(--text); font-size: 15px;}
+    
+    .para-item { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px dashed var(--border); }
+    .para-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .para-question { font-weight: 600; margin-bottom: 10px; color: var(--text); line-height: 1.5; }
+    .para-answer { background: var(--bg); padding: 12px 16px; border-radius: 10px; font-size: 14px; line-height: 1.6; color: var(--text-muted); border: 1px solid var(--border); margin-bottom: 12px; }
+    .para-score-row { display: flex; gap: 12px; align-items: center; }
+    .para-score-row input { margin: 0; padding: 10px 12px; width: 80px; text-align: center; font-weight: 600; }
+    .para-score-row button { width: auto; padding: 10px 16px; background: var(--secondary); box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2); }
+    .para-score-row button:hover { background: #059669; box-shadow: 0 6px 14px rgba(16, 185, 129, 0.3); }
+    
+    .spinner { width: 30px; height: 30px; border: 3px solid rgba(79, 70, 229, 0.2); border-left-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 10px auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <div class="tab">
+    <button class="tablinks active" onclick="openTab(event, 'General')">Hệ thống</button>
+    <button class="tablinks" onclick="openTab(event, 'Report')">Tra cứu</button>
+  </div>
+
+  <div id="General" class="tabcontent" style="display:block;">
+    <h2>Thông tin hệ thống</h2>
+    <p style="color: var(--text-muted); line-height: 1.6; margin-bottom: 20px;">Chia sẻ liên kết này để ứng viên bắt đầu làm bài test. Link được bảo mật và tự động hóa toàn bộ quy trình.</p>
+    <button class="action-btn" onclick="copyLink()">
+      <span style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+        Copy Link Bài Test
+      </span>
+    </button>
+  </div>
+
+  <div id="Report" class="tabcontent">
+    <h2>Tra cứu ứng viên</h2>
+    <input type="email" id="searchEmail" placeholder="Nhập email ứng viên...">
+    <button class="action-btn" onclick="fetchReport()">Phân tích dữ liệu</button>
+    
+    <div id="loading">
+      <div class="spinner"></div>
+      Đang tải dữ liệu...
+    </div>
+
+    <div id="reportContainer" style="display:none; margin-top: 24px;">
+      <div class="card">
+        <h3>Tổng quan Kết quả</h3>
+        <div class="stat-row">
+          <span class="stat-label">Tổng điểm đạt được</span>
+          <span class="stat-value" id="rTotal" style="color: var(--primary); font-size: 18px;"></span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Thời gian hoàn thành</span>
+          <span class="stat-value"><span id="rTime"></span>s</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Phân tích Tính cách (DISC)</h3>
+        <div class="disc-box">
+          <h4 id="rDisc"></h4>
+          <p>
+            <b>D</b> - Cạnh tranh, Quyết đoán<br>
+            <b>I</b> - Giao tiếp, Lạc quan<br>
+            <b>S</b> - Kiên định, Ổn định<br>
+            <b>C</b> - Logic, Chuẩn xác
+          </p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Biểu đồ Năng lực</h3>
+        <canvas id="radarChart"></canvas>
+      </div>
+
+      <div id="paragraphContainer" class="card">
+        <h3>Đánh giá Tự luận</h3>
+        <div id="paraList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let myRadarChart = null;
+
+    function openTab(evt, tabName) {
+      var i, tabcontent, tablinks;
+      tabcontent = document.getElementsByClassName("tabcontent");
+      for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+      }
+      tablinks = document.getElementsByClassName("tablinks");
+      for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+      }
+      document.getElementById(tabName).style.display = "block";
+      evt.currentTarget.className += " active";
+    }
+
+    function copyLink() {
+      const btn = document.querySelector('#General button');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = 'Đang lấy link...';
+      
+      google.script.run.withSuccessHandler(url => {
+        navigator.clipboard.writeText(url).then(() => {
+          btn.innerHTML = 'Đã copy thành công ✓';
+          btn.style.background = 'var(--secondary)';
+          setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.style.background = 'var(--primary)';
+          }, 2000);
+        }).catch(err => {
+          prompt("Copy link bên dưới:", url);
+          btn.innerHTML = originalText;
+        });
+      }).getWebAppUrl();
+    }
+
+    function fetchReport() {
+      const email = document.getElementById('searchEmail').value.trim();
+      if (!email) return alert('Vui lòng nhập email!');
+      
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('reportContainer').style.display = 'none';
+
+      google.script.run.withSuccessHandler(data => {
+        document.getElementById('loading').style.display = 'none';
+        if (!data) return alert('Không tìm thấy dữ liệu cho email này.');
+        
+        document.getElementById('reportContainer').style.display = 'block';
+        document.getElementById('rTotal').innerText = data.totalScore;
+        document.getElementById('rTime').innerText = data.timeTaken;
+        document.getElementById('rDisc').innerText = "Profile: " + (data.discProfile || "Chưa có");
+
+        renderChart(data.catScores);
+        renderParagraphs(data.paragraphAnswers, data.email);
+      }).getCandidateReport(email);
+    }
+
+    function renderChart(scores) {
+      const ctx = document.getElementById('radarChart').getContext('2d');
+      const labels = Object.keys(scores);
+      const dataPoints = Object.values(scores);
+
+      if (myRadarChart) myRadarChart.destroy();
+
+      Chart.defaults.font.family = "'Outfit', sans-serif";
+      
+      myRadarChart = new Chart(ctx, {
+        type: 'radar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Điểm số',
+            data: dataPoints,
+            backgroundColor: 'rgba(79, 70, 229, 0.2)',
+            borderColor: 'rgba(79, 70, 229, 1)',
+            pointBackgroundColor: 'rgba(79, 70, 229, 1)',
+            pointBorderColor: '#fff',
+            pointHoverBackgroundColor: '#fff',
+            pointHoverBorderColor: 'rgba(79, 70, 229, 1)',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          scales: {
+            r: { 
+              beginAtZero: true,
+              ticks: { backdropColor: 'transparent' }
+            }
+          },
+          plugins: {
+            legend: { display: false }
+          }
+        }
+      });
+    }
+
+    function renderParagraphs(paras, email) {
+      const list = document.getElementById('paraList');
+      list.innerHTML = "";
+      if (!paras || paras.length === 0) {
+        list.innerHTML = "<p style='color: var(--text-muted); font-style: italic;'>Ứng viên không có câu trả lời tự luận.</p>";
+        return;
+      }
+
+      paras.forEach(p => {
+        let div = document.createElement('div');
+        div.className = 'para-item';
+        
+        div.innerHTML = `
+          <div class="para-question">${p.question}</div>
+          <div class="para-answer">${p.answer ? p.answer.replace(/\\n/g, '<br>') : '<i>Không có câu trả lời</i>'}</div>
+          <div class="para-score-row">
+            <input type="number" id="score_${p.id}" value="${p.currentScore}" min="0">
+            <button class="action-btn" onclick="updateScore('${email}', '${p.id}', this)">Cập nhật điểm</button>
+          </div>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function updateScore(email, qId, btn) {
+      const newScore = document.getElementById(`score_${qId}`).value;
+      const originalText = btn.innerText;
+      btn.innerText = "Đang lưu...";
+      btn.style.opacity = "0.7";
+      
+      google.script.run.withSuccessHandler(() => {
+        btn.innerText = "Đã lưu ✓";
+        btn.style.opacity = "1";
+        setTimeout(() => { btn.innerText = originalText; }, 2000);
+      }).updateParagraphScore(email, qId, newScore);
+    }
+  </script>
+</body>
+</html>
