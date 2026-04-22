@@ -98,6 +98,36 @@ function saveSystemSettings(settingsObj) {
   return "Lưu cài đặt thành công!";
 }
 
+function getDashboardStats() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const resSheet = ss.getSheetByName('RESULTS');
+  if(!resSheet) return { total: 0, avgScore: 0, positionCounts: {} };
+
+  const data = resSheet.getDataRange().getValues();
+  if(data.length < 2) return { total: 0, avgScore: 0, positionCounts: {} };
+
+  let totalCandidates = data.length - 1;
+  let totalScoreSum = 0;
+  let posCounts = {};
+
+  for(let i=1; i<data.length; i++){
+    if(!data[i][2]) continue; // skip empty rows
+
+    let score = Number(data[i][5]) || 0;
+    totalScoreSum += score;
+
+    let pos = data[i][4] || "Chưa xác định";
+    if(!posCounts[pos]) posCounts[pos] = 0;
+    posCounts[pos]++;
+  }
+
+  return {
+    total: totalCandidates,
+    avgScore: (totalScoreSum / totalCandidates).toFixed(2),
+    positionCounts: posCounts
+  };
+}
+
 function getCandidatesList() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -204,13 +234,27 @@ function getCandidateReport(email) {
     }
   });
 
+  // Determine Pass/Fail status
+  let passStatus = "CHƯA XÁC ĐỊNH";
+  const configData = ss.getSheetByName('CONFIG').getDataRange().getValues();
+  const configHeaders = configData[0];
+  const config = configData.find(r => r[0] === cRes[4]); // Match by position
+  if (config) {
+    const passIdx = configHeaders.indexOf('Pass_Score');
+    if (passIdx !== -1 && config[passIdx] !== "") {
+      const requiredScore = Number(config[passIdx]);
+      passStatus = Number(cRes[5]) >= requiredScore ? "ĐẠT" : "KHÔNG ĐẠT";
+    }
+  }
+
   return {
     email: email,
     totalScore: cRes[5],
     timeTaken: cRes[7],
     discProfile: cRes[12],
     catScores: catScores,
-    paragraphAnswers: paragraphAnswers
+    paragraphAnswers: paragraphAnswers,
+    passStatus: passStatus
   };
 }
 
@@ -310,7 +354,12 @@ function generateExportData(email) {
       output += `Q: ${qData[6]}\n`;
       output += `Trả lời: ${ansData[4]}\n`;
 
-      if (cat !== 'Personality' && qData[9] !== 'PARAGRAPH') {
+      if (cat === 'Personality') {
+        output += `Đánh giá DISC nội bộ: Đáp án này thuộc nhóm tính cách nào đó (D, I, S, C).\n`;
+      } else if (qData[9] === 'PARAGRAPH') {
+        output += `Loại câu hỏi: TỰ LUẬN (PARAGRAPH)\n`;
+        output += `Điểm được HR/AI đánh giá: ${ansData[6]}\n`;
+      } else {
         output += `Đáp án đúng: ${qData[17]}\n`;
         output += `Kết quả: ${ansData[5] ? 'ĐÚNG' : 'SAI'} (Điểm: ${ansData[6]})\n`;
       }
@@ -347,10 +396,10 @@ function initSystem() {
   let configSheet = ss.getSheetByName('CONFIG');
   if (!configSheet) {
     configSheet = ss.insertSheet('CONFIG');
-    const headers = ['Position', 'IQ_1_Count', 'IQ_2_Count', 'IQ_3_Count', 'EQ_1_Count', 'EQ_2_Count', 'EQ_3_Count', 'Problem_Solving_1_Count', 'Problem_Solving_2_Count', 'Problem_Solving_3_Count', 'Leadership_1_Count', 'Leadership_2_Count', 'Leadership_3_Count', 'Personality_1_Count', 'Duration_Minutes'];
+    const headers = ['Position', 'IQ_1_Count', 'IQ_2_Count', 'IQ_3_Count', 'EQ_1_Count', 'EQ_2_Count', 'EQ_3_Count', 'Problem_Solving_1_Count', 'Problem_Solving_2_Count', 'Problem_Solving_3_Count', 'Leadership_1_Count', 'Leadership_2_Count', 'Leadership_3_Count', 'Personality_1_Count', 'Duration_Minutes', 'Pass_Score'];
     configSheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
-    configSheet.appendRow(['Nhân viên văn phòng', 2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 1, 5, 30]);
-    configSheet.appendRow(['Quản lý cấp trung', 1, 2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 5, 45]);
+    configSheet.appendRow(['Nhân viên văn phòng', 2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 1, 5, 30, 10]);
+    configSheet.appendRow(['Quản lý cấp trung', 1, 2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 5, 45, 15]);
   }
 
   if (!ss.getSheetByName('ANSWERS')) {
@@ -379,6 +428,7 @@ function initSystem() {
     setSheet.appendRow(['Logo_URL', '']);
     setSheet.appendRow(['Anti_Cheat_Enabled', 'TRUE']);
     setSheet.appendRow(['Anti_Cheat_Max_Violations', '3']);
+    setSheet.appendRow(['HR_Notification_Email', '']);
   }
   
   return "Hệ thống đã khởi tạo thành công!";
@@ -415,6 +465,17 @@ function getPositions() {
 
 function generateTest(candidateInfo) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Prevent duplicate submissions
+  const resSheet = ss.getSheetByName('RESULTS');
+  if (resSheet) {
+    const resData = resSheet.getDataRange().getValues();
+    const existing = resData.find(r => r[2] === candidateInfo.email);
+    if (existing) {
+      throw new Error("Email này đã hoàn thành bài test và được ghi nhận hệ thống. Không thể thi lại.");
+    }
+  }
+
   const configData = ss.getSheetByName('CONFIG').getDataRange().getValues();
   const configHeaders = configData[0];
   const config = configData.find(r => r[0] === candidateInfo.position);
@@ -544,6 +605,20 @@ function processResults(submission) {
   let discProfile = `${discArray[0].type}-${discArray[1].type}`;
 
   ss.getSheetByName('RESULTS').appendRow([ts, submission.candidateInfo.fullName, submission.candidateInfo.email, submission.candidateInfo.phone, submission.candidateInfo.position, score, rawAI.join('\n'), submission.timeTaken || 0, discCounts.D, discCounts.I, discCounts.S, discCounts.C, discProfile]);
+
+  // Notification Logic
+  try {
+    const settings = getSystemSettings();
+    const hrEmail = settings['HR_Notification_Email'];
+    if (hrEmail && hrEmail.trim() !== '') {
+      const subject = `[Test System] Có ứng viên mới hoàn thành bài test: ${submission.candidateInfo.fullName}`;
+      const body = `Hệ thống vừa ghi nhận bài làm mới.\n\nThông tin:\n- Ứng viên: ${submission.candidateInfo.fullName}\n- Email: ${submission.candidateInfo.email}\n- Vị trí: ${submission.candidateInfo.position}\n- Tổng điểm ban đầu: ${score}\n- DISC Profile: ${discProfile}\n\nVui lòng truy cập Admin Panel để xem chi tiết và chấm điểm tự luận.`;
+      MailApp.sendEmail(hrEmail.trim(), subject, body);
+    }
+  } catch(e) {
+    // Ignore email errors to not fail the submission
+  }
+
   return "Nộp bài thành công!";
 }
 
