@@ -177,6 +177,8 @@
       document.getElementById('next-btn').style.display = 'inline-block';
       document.getElementById('finish-btn').style.display = 'none';
     }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function prevPage() { if (currentPageIndex > 0) showPage(currentPageIndex - 1); }

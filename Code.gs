@@ -109,6 +109,7 @@ function getCandidatesList() {
       timestamp: data[i][0],
       fullName: data[i][1],
       email: data[i][2],
+      phone: data[i][3],
       position: data[i][4],
       totalScore: data[i][5]
     });
@@ -262,30 +263,51 @@ function generateExportData(email) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const qbData = ss.getSheetByName('QUESTIONBANK').getDataRange().getValues();
   const ansData = ss.getSheetByName('ANSWERS').getDataRange().getValues();
+  const resData = ss.getSheetByName('RESULTS').getDataRange().getValues();
 
-  // Filter answers by email
+  const cRes = resData.find(r => r[2] === email);
   const candidateAnswers = ansData.filter(r => r[1] === email);
-  if (candidateAnswers.length === 0) return "Không tìm thấy dữ liệu cho email này.";
 
-  let output = `KẾT QUẢ BÀI TEST - Ứng viên: ${email}\n==============================================\n\n`;
+  if (candidateAnswers.length === 0 || !cRes) return "Không tìm thấy dữ liệu cho email này.";
 
+  let output = `[BÁO CÁO KẾT QUẢ BÀI TEST - SYSTEM EXPORT]\n`;
+  output += `==============================================\n`;
+  output += `THÔNG TIN ỨNG VIÊN:\n`;
+  output += `Họ tên: ${cRes[1]}\nEmail: ${cRes[2]}\nSố điện thoại: ${cRes[3]}\nVị trí: ${cRes[4]}\n`;
+  output += `Tổng điểm: ${cRes[5]}\nThời gian làm bài: ${cRes[7]} giây\n`;
+  output += `DISC Profile: ${cRes[12]}\n`;
+  output += `==============================================\n\n`;
+
+  // Group answers by category
+  let grouped = {};
   candidateAnswers.forEach(ans => {
     const qID = ans[2];
-    const candidateAnswer = ans[4];
-    const isCorrect = ans[5];
     const qData = qbData.find(q => q[0] === qID);
-
     if (qData) {
-      output += `[${qData[1]}] Câu hỏi: ${qData[6]}\n`;
-      output += `- Ứng viên chọn: ${candidateAnswer}\n`;
-      if (qData[1] !== 'Personality' && qData[9] !== 'PARAGRAPH') {
-        output += `- Đáp án đúng của hệ thống: ${qData[17]}\n`;
-        output += `- Kết quả chấm tự động: ${isCorrect ? 'ĐÚNG' : 'SAI'}\n`;
-      }
-      output += `\n`;
+      let cat = qData[1];
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push({ ansData: ans, qData: qData });
     }
   });
 
+  for (let cat in grouped) {
+    output += `--- PHẦN: ${cat.toUpperCase()} ---\n`;
+    grouped[cat].forEach(item => {
+      const qData = item.qData;
+      const ansData = item.ansData;
+
+      output += `Q: ${qData[6]}\n`;
+      output += `Trả lời: ${ansData[4]}\n`;
+
+      if (cat !== 'Personality' && qData[9] !== 'PARAGRAPH') {
+        output += `Đáp án đúng: ${qData[17]}\n`;
+        output += `Kết quả: ${ansData[5] ? 'ĐÚNG' : 'SAI'} (Điểm: ${ansData[6]})\n`;
+      }
+      output += `\n`;
+    });
+  }
+
+  output += `[END OF REPORT]`;
   return output;
 }
 

@@ -130,18 +130,33 @@
     <!-- REPORT TAB -->
     <div id="Report" class="tabcontent">
       <h2>Tra cứu & Chấm điểm Tự luận</h2>
-      <div style="display:flex; gap: 10px;">
-        <input type="email" id="searchEmail" placeholder="Nhập email ứng viên">
-        <button class="action-btn" style="width: 120px;" onclick="fetchReport()">Tra cứu</button>
-      </div>
-      <div id="loadingReport" class="loader">Đang tải...</div>
+      <p style="color: #555;">Tìm kiếm ứng viên theo Tên, Email, SĐT hoặc Vị trí. Click vào ứng viên để xem báo cáo chi tiết.</p>
 
-      <div id="reportContainer" style="display:none; margin-top: 20px;">
+      <div style="display:flex; gap: 10px; margin-bottom: 20px;">
+        <input type="text" id="reportSearch" placeholder="Tìm kiếm...">
+        <button class="action-btn" style="width: 150px; background: #e67e22;" onclick="loadReportCandidates()">Tải Danh sách</button>
+      </div>
+      <div id="loadingReportList" class="loader">Đang tải danh sách...</div>
+
+      <table class="data-table" id="reportCandidatesTable" style="display: none;">
+        <thead><tr><th>Ngày thi</th><th>Họ Tên</th><th>Email</th><th>SĐT</th><th>Vị trí</th><th>Hành động</th></tr></thead>
+        <tbody id="reportCandidatesTbody"></tbody>
+      </table>
+
+      <div id="loadingReport" class="loader">Đang tải báo cáo...</div>
+
+      <div id="reportContainer" style="display:none; margin-top: 30px; border-top: 2px solid #3498db; padding-top: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+          <h2 style="margin: 0;">Báo cáo chi tiết: <span id="rNameTitle" style="color: #e67e22;"></span></h2>
+          <button class="action-btn" style="width: auto; background: #9b59b6;" onclick="downloadTxtReport()">Tải file TXT cho AI</button>
+        </div>
+
         <div style="display: flex; gap: 20px; flex-wrap: wrap;">
           <div class="card" style="flex: 1; min-width: 300px;">
             <h3>Tổng quan</h3>
             <p><b>Tổng điểm:</b> <span id="rTotal" style="font-size: 24px; color: #e74c3c; font-weight: bold;"></span></p>
             <p><b>Thời gian làm bài:</b> <span id="rTime"></span> giây</p>
+            <p><b>Email:</b> <span id="rEmail"></span></p>
 
             <h3 style="margin-top: 20px;">Hồ sơ DISC</h3>
             <div class="disc-box">
@@ -355,9 +370,52 @@
     }
 
     // --- REPORT TAB ---
-    function fetchReport() {
-      const email = document.getElementById('searchEmail').value.trim();
-      if (!email) return alert('Nhập email!');
+    let fullReportList = [];
+
+    function loadReportCandidates() {
+      document.getElementById('loadingReportList').style.display = 'block';
+      document.getElementById('reportCandidatesTable').style.display = 'none';
+      document.getElementById('reportContainer').style.display = 'none';
+
+      google.script.run.withSuccessHandler(list => {
+        fullReportList = list;
+        renderReportCandidatesTable();
+        document.getElementById('loadingReportList').style.display = 'none';
+        document.getElementById('reportCandidatesTable').style.display = 'table';
+      }).getCandidatesList();
+    }
+
+    document.getElementById('reportSearch').addEventListener('input', renderReportCandidatesTable);
+
+    function renderReportCandidatesTable() {
+      const q = document.getElementById('reportSearch').value.toLowerCase();
+      const tbody = document.getElementById('reportCandidatesTbody');
+      tbody.innerHTML = "";
+
+      const filtered = fullReportList.filter(c => {
+         return c.fullName.toLowerCase().includes(q) ||
+                c.email.toLowerCase().includes(q) ||
+                (c.phone && c.phone.toString().includes(q)) ||
+                c.position.toLowerCase().includes(q);
+      });
+
+      filtered.forEach(c => {
+        let tr = `<tr>
+          <td>${new Date(c.timestamp).toLocaleString()}</td>
+          <td>${c.fullName}</td>
+          <td>${c.email}</td>
+          <td>${c.phone || ''}</td>
+          <td>${c.position}</td>
+          <td><button class="action-btn" style="padding: 6px; width:auto;" onclick="fetchReport('${c.email}', '${escapeHtml(c.fullName)}')">Xem Báo Cáo</button></td>
+        </tr>`;
+        tbody.innerHTML += tr;
+      });
+    }
+
+    let currentReportEmail = "";
+
+    function fetchReport(email, name) {
+      currentReportEmail = email;
       document.getElementById('loadingReport').style.display = 'block';
       document.getElementById('reportContainer').style.display = 'none';
 
@@ -366,13 +424,36 @@
         if (!data) return alert('Không tìm thấy dữ liệu.');
 
         document.getElementById('reportContainer').style.display = 'block';
+        document.getElementById('rNameTitle').innerText = name;
+        document.getElementById('rEmail').innerText = data.email;
         document.getElementById('rTotal').innerText = data.totalScore;
         document.getElementById('rTime').innerText = data.timeTaken;
         document.getElementById('rDisc').innerText = "Profile: " + (data.discProfile || "Chưa có");
 
         renderChart(data.catScores, 'radarChart');
         renderParagraphs(data.paragraphAnswers, data.email);
+
+        // Scroll down to report
+        document.getElementById('reportContainer').scrollIntoView({ behavior: 'smooth' });
       }).getCandidateReport(email);
+    }
+
+    function downloadTxtReport() {
+      if (!currentReportEmail) return;
+      document.getElementById('loadingReport').style.display = 'block';
+
+      google.script.run.withSuccessHandler(txtData => {
+        document.getElementById('loadingReport').style.display = 'none';
+        const blob = new Blob([txtData], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Bao_Cao_${currentReportEmail}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }).generateExportData(currentReportEmail);
     }
 
     function renderChart(scores, canvasId) {
