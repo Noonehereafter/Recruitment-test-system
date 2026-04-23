@@ -157,13 +157,13 @@
   }
 
   function jumpToQuestion(qId, pageIndex) {
-    showPage(pageIndex);
+    showPage(pageIndex, true); // skip scrolling to top
     setTimeout(() => {
       document.getElementById('qblock-' + qId).scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 100);
   }
 
-  function showPage(index) {
+  function showPage(index, skipScroll = false) {
     pages.forEach(p => p.classList.remove('active'));
     pages[index].classList.add('active');
     currentPageIndex = index;
@@ -178,7 +178,9 @@
       document.getElementById('finish-btn').style.display = 'none';
     }
 
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (!skipScroll) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }
 
   function prevPage() { if (currentPageIndex > 0) showPage(currentPageIndex - 1); }

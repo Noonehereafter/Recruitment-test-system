@@ -1,5 +1,5 @@
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
 
 :root {
   --primary: #4F46E5;
@@ -18,7 +18,7 @@
 }
 
 body {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Roboto', sans-serif;
   background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
   color: var(--text-main);
   padding: 40px 20px;
@@ -66,7 +66,7 @@ input[type="text"], input[type="email"], input[type="tel"], select, textarea {
   border: 1.5px solid var(--border);
   border-radius: 12px;
   background: #F9FAFB;
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Roboto', sans-serif;
   font-size: 15px;
   color: var(--text-main);
   transition: all 0.3s ease;
@@ -90,7 +90,7 @@ button {
   cursor: pointer;
   font-weight: 600;
   font-size: 16px;
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Roboto', sans-serif;
   letter-spacing: 0.5px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
@@ -274,11 +274,37 @@ button:active {
 /* Pagination and Navigation */
 .page-group { display: none; }
 .page-group.active { display: block; }
-.nav-buttons { display: flex; justify-content: space-between; margin-top: 30px; gap: 15px; }
-.nav-btn { flex: 1; background: #6B7280; }
-.nav-btn:hover { background: #4B5563; }
+
+.nav-buttons {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  z-index: 1000;
+  padding: 0 20px;
+}
+
+.nav-btn {
+  pointer-events: auto;
+  width: auto;
+  background: #6B7280;
+  padding: 15px 25px;
+  border-radius: 50px;
+  box-shadow: var(--shadow-lg);
+}
+
+.nav-btn:hover { background: #4B5563; transform: scale(1.05); }
 .nav-btn.primary { background: var(--primary); }
-.nav-btn.primary:hover { background: var(--primary-hover); }
+.nav-btn.primary:hover { background: var(--primary-hover); transform: scale(1.05); }
+
+@media (max-width: 900px) {
+  .nav-buttons { padding: 0 5px; }
+  .nav-btn { padding: 10px 15px; font-size: 14px; }
+}
 
 /* Palette */
 #palette-container { background: white; padding: 20px; border-radius: var(--radius); box-shadow: var(--shadow-sm); margin-bottom: 24px; border: 1px solid var(--border); }
