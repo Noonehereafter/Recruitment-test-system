@@ -345,13 +345,16 @@ function generateExportData(email) {
     }
   });
 
+  const diffMap = { "1": "Dễ", "2": "Trung bình", "3": "Khó" };
+
   for (let cat in grouped) {
     output += `--- PHẦN: ${cat.toUpperCase()} ---\n`;
     grouped[cat].forEach(item => {
       const qData = item.qData;
       const ansData = item.ansData;
+      const difficulty = diffMap[String(qData[3])] || qData[3];
 
-      output += `Q: ${qData[6]}\n`;
+      output += `Q: ${qData[6]} (Độ khó: ${difficulty})\n`;
       output += `Trả lời: ${ansData[4]}\n`;
 
       if (cat === 'Personality') {
