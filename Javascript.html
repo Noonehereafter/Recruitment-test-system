@@ -296,11 +296,15 @@
     document.getElementById('loading').style.display = 'block';
     document.getElementById('loading').innerText = 'Đang nộp bài...';
     google.script.run.withSuccessHandler(m => {
+      // Clear local storage ONLY on successful submission
+      localStorage.removeItem('testState');
       document.getElementById('loading').style.display = 'none';
       document.getElementById('result-screen').style.display = 'block';
       document.getElementById('result-msg').textContent = m;
     }).withFailureHandler(err => {
       alert("Có lỗi xảy ra khi nộp bài: " + err.message);
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('test-screen').style.display = 'block';
     }).processResults(payload);
   }
 </script>
