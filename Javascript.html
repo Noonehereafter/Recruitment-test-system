@@ -280,9 +280,6 @@
     const answers = getAnswers();
     let timeTaken = totalTime - timeRemaining;
 
-    // Clear local storage on submit
-    localStorage.removeItem('testState');
-
     const payload = { candidateInfo: testData.candidateInfo, answers: answers, timeTaken: timeTaken };
 
     // Offline Tolerance Handler

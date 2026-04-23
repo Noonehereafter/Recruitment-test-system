@@ -596,24 +596,32 @@
     function generatePDF(reports) {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
+      // Add font support for Vietnamese.
+      // We will use the built-in basic text, but jsPDF base fonts do not support Vietnamese diacritics well.
+      // To properly fix it we can add a font, but since base jsPDF is used here, we'll strip diacritics
+      // or instruct users to use the TXT export for AI if they need the exact text.
+      // We'll add a helper to strip diacritics for the PDF.
+      const removeDiacritics = (str) => {
+        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D");
+      };
 
       reports.forEach((rep, index) => {
         if (index > 0) doc.addPage();
 
         doc.setFontSize(18);
-        doc.text("Báo cáo Kết quả Tuyển dụng", 105, 20, null, null, "center");
+        doc.text(removeDiacritics("Báo cáo Kết quả Tuyển dụng"), 105, 20, null, null, "center");
 
         doc.setFontSize(12);
-        doc.text(`Họ tên: ${rep.fullName}`, 20, 40);
-        doc.text(`Email: ${rep.email}`, 20, 50);
-        doc.text(`Tổng điểm: ${rep.totalScore}`, 20, 60);
-        doc.text(`Thời gian làm bài: ${rep.timeTaken}s`, 20, 70);
-        doc.text(`DISC Profile: ${rep.discProfile || 'N/A'}`, 20, 80);
+        doc.text(removeDiacritics(`Họ tên: ${rep.fullName}`), 20, 40);
+        doc.text(removeDiacritics(`Email: ${rep.email}`), 20, 50);
+        doc.text(removeDiacritics(`Tổng điểm: ${rep.totalScore}`), 20, 60);
+        doc.text(removeDiacritics(`Thời gian làm bài: ${rep.timeTaken}s`), 20, 70);
+        doc.text(removeDiacritics(`DISC Profile: ${rep.discProfile || 'N/A'}`), 20, 80);
 
-        doc.text("Điểm theo từng phần:", 20, 100);
+        doc.text(removeDiacritics("Điểm theo từng phần:"), 20, 100);
         let y = 110;
         for (let cat in rep.catScores) {
-          doc.text(`- ${cat}: ${rep.catScores[cat]}`, 25, y);
+          doc.text(removeDiacritics(`- ${cat}: ${rep.catScores[cat]}`), 25, y);
           y += 10;
         }
       });

@@ -33,17 +33,17 @@ body {
   width: 100%;
   max-width: 800px;
   background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
   padding: 40px;
   border-radius: 24px;
   box-shadow: var(--shadow-lg);
   border: 1px solid rgba(255,255,255,0.6);
   animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 h2, h3 {
@@ -278,14 +278,13 @@ button:active {
 .nav-buttons {
   position: fixed;
   top: 50%;
-  left: 0;
-  right: 0;
+  left: 20px;
+  right: 20px;
   transform: translateY(-50%);
   display: flex;
   justify-content: space-between;
   pointer-events: none;
   z-index: 1000;
-  padding: 0 20px;
 }
 
 .nav-btn {
@@ -295,15 +294,27 @@ button:active {
   padding: 15px 25px;
   border-radius: 50px;
   box-shadow: var(--shadow-lg);
+  transition: all 0.3s;
 }
 
 .nav-btn:hover { background: #4B5563; transform: scale(1.05); }
 .nav-btn.primary { background: var(--primary); }
 .nav-btn.primary:hover { background: var(--primary-hover); transform: scale(1.05); }
 
-@media (max-width: 900px) {
-  .nav-buttons { padding: 0 5px; }
-  .nav-btn { padding: 10px 15px; font-size: 14px; }
+@media (max-width: 1000px) {
+  .nav-buttons {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    transform: none;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 15px;
+    box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
+    backdrop-filter: blur(10px);
+  }
+  .nav-btn { padding: 10px 20px; font-size: 14px; }
 }
 
 /* Palette */
