@@ -293,11 +293,58 @@ function getConfigData() {
   let configSheet = ss.getSheetByName('CONFIG');
   if (!configSheet) return { headers: [], data: [] };
 
-  const values = configSheet.getDataRange().getValues();
+  let values = configSheet.getDataRange().getValues();
   if (values.length < 1) return { headers: [], data: [] };
 
+  let headers = values[0];
+
+  // Dynamic parsing of new categories from QUESTIONBANK
+  let qbSheet = ss.getSheetByName('QUESTIONBANK');
+  if (qbSheet) {
+    let qbData = qbSheet.getDataRange().getValues();
+    if (qbData.length > 1) {
+      let qbHeaders = qbData[0];
+      let catIdx = qbHeaders.indexOf('Category');
+      let diffIdx = qbHeaders.indexOf('Difficulty');
+
+      if (catIdx !== -1 && diffIdx !== -1) {
+        let uniqueCombinations = new Set();
+        for (let i = 1; i < qbData.length; i++) {
+          let cat = String(qbData[i][catIdx]).trim();
+          let diff = String(qbData[i][diffIdx]).trim();
+          if (cat && diff) {
+            uniqueCombinations.add(`${cat}_${diff}_Count`);
+          }
+        }
+
+        let headerChanged = false;
+        uniqueCombinations.forEach(comb => {
+          if (!headers.includes(comb)) {
+            // Check if column is placed before Duration_Minutes
+            let insertIdx = headers.indexOf('Duration_Minutes');
+            if (insertIdx === -1) insertIdx = headers.length;
+
+            headers.splice(insertIdx, 0, comb);
+            headerChanged = true;
+
+            // Add 0 to all data rows for the new column
+            for (let r = 1; r < values.length; r++) {
+              values[r].splice(insertIdx, 0, 0);
+            }
+          }
+        });
+
+        if (headerChanged) {
+          configSheet.clearContents();
+          configSheet.getRange(1, 1, values.length, headers.length).setValues(values);
+          configSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+        }
+      }
+    }
+  }
+
   return {
-    headers: values[0],
+    headers: headers,
     data: values.slice(1)
   };
 }
@@ -439,7 +486,6 @@ function initSystem() {
 
 function setupValidation(sheet) {
   const rules = {
-    'B': ['Personality', 'IQ', 'EQ', 'ProblemSolving', 'Leadership'],
     'C': ['All', 'Staff', 'Manager', 'Senior'],
     'F': ['Active', 'Inactive', 'Review'],
     'J': ['MULTIPLECHOICE', 'CHECKBOX', 'PARAGRAPH', 'SCALE', 'DROPDOWN'],
@@ -508,15 +554,20 @@ function generateTest(candidateInfo) {
     for (let i = 1; i < configHeaders.length; i++) {
       const h = configHeaders[i];
       if (h.endsWith('_Count')) {
-        const parts = h.replace('_Count', '').split('_');
-        let cat = parts[0];
+        let namePart = h.replace('_Count', '');
+        let lastUnderscore = namePart.lastIndexOf('_');
+
+        let cat = namePart;
         let diff = "ANY";
-        if (parts.length >= 2 && !isNaN(parts[parts.length - 1])) {
-          diff = parts.pop();
-          cat = parts.join('_');
-        } else if (parts.length > 1) {
-          cat = parts.join('_');
+
+        if (lastUnderscore !== -1) {
+            let possibleDiff = namePart.substring(lastUnderscore + 1);
+            if (!isNaN(possibleDiff)) {
+                diff = possibleDiff;
+                cat = namePart.substring(0, lastUnderscore);
+            }
         }
+
         if (!diffCounts[cat]) diffCounts[cat] = {};
         diffCounts[cat][diff] = Number(config[i]) || 0;
       }

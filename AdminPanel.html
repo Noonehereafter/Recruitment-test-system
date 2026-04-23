@@ -320,14 +320,18 @@
       let groups = {};
       currentConfigData.headers.forEach((h, i) => {
         if (h.endsWith('_Count')) {
-          const parts = h.replace('_Count', '').split('_');
-          let cat = parts[0];
+          let namePart = h.replace('_Count', '');
+          let lastUnderscore = namePart.lastIndexOf('_');
+
+          let cat = namePart;
           let diff = "ANY";
-          if (parts.length >= 2 && !isNaN(parts[parts.length - 1])) {
-            diff = parts.pop();
-            cat = parts.join('_');
-          } else if (parts.length > 1) {
-            cat = parts.join('_');
+
+          if (lastUnderscore !== -1) {
+              let possibleDiff = namePart.substring(lastUnderscore + 1);
+              if (!isNaN(possibleDiff)) {
+                  diff = possibleDiff;
+                  cat = namePart.substring(0, lastUnderscore);
+              }
           }
           if(!groups[cat]) groups[cat] = [];
           groups[cat].push({ index: i, header: h, diff: diff, value: row[i] });
@@ -434,15 +438,40 @@
       });
 
       filtered.forEach(c => {
-        let tr = `<tr>
-          <td>${new Date(c.timestamp).toLocaleString()}</td>
-          <td>${c.fullName}</td>
-          <td>${c.email}</td>
-          <td>${c.phone || ''}</td>
-          <td>${c.position}</td>
-          <td><button class="action-btn" style="padding: 6px; width:auto;" onclick="fetchReport('${c.email}', '${escapeHtml(c.fullName)}')">Xem Báo Cáo</button></td>
-        </tr>`;
-        tbody.innerHTML += tr;
+        let tr = document.createElement('tr');
+
+        let tdTime = document.createElement('td');
+        tdTime.textContent = new Date(c.timestamp).toLocaleString();
+
+        let tdName = document.createElement('td');
+        tdName.textContent = c.fullName;
+
+        let tdEmail = document.createElement('td');
+        tdEmail.textContent = c.email;
+
+        let tdPhone = document.createElement('td');
+        tdPhone.textContent = c.phone || '';
+
+        let tdPos = document.createElement('td');
+        tdPos.textContent = c.position;
+
+        let tdAction = document.createElement('td');
+        let btn = document.createElement('button');
+        btn.className = "action-btn";
+        btn.style.padding = "6px";
+        btn.style.width = "auto";
+        btn.textContent = "Xem Báo Cáo";
+        btn.onclick = function() { fetchReport(c.email, c.fullName); };
+        tdAction.appendChild(btn);
+
+        tr.appendChild(tdTime);
+        tr.appendChild(tdName);
+        tr.appendChild(tdEmail);
+        tr.appendChild(tdPhone);
+        tr.appendChild(tdPos);
+        tr.appendChild(tdAction);
+
+        tbody.appendChild(tr);
       });
     }
 
@@ -520,7 +549,7 @@
     }
 
     function escapeHtml(unsafe) {
-      return (unsafe || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+      return (unsafe || "").toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
     }
 
     function renderParagraphs(paras, email) {
@@ -535,13 +564,14 @@
         div.style.marginBottom = "15px"; div.style.paddingBottom = "10px"; div.style.borderBottom = "1px dashed #ccc";
 
         let safeAnswer = escapeHtml(p.answer);
+        let safeId = escapeHtml(p.id);
 
         div.innerHTML = `
           <strong>${escapeHtml(p.question)}</strong>
           <p style="background:#f9f9f9; padding:8px; border-radius:4px; font-size:13px;">${safeAnswer}</p>
           <div style="display:flex; gap:10px; align-items:center;">
-            <input type="number" id="score_${p.id}" value="${p.currentScore}" style="width:70px;">
-            <button onclick="updateScore('${email}', '${p.id}')" class="action-btn" style="width:auto; padding: 8px;">Lưu điểm</button>
+            <input type="number" id="score_${safeId}" value="${p.currentScore}" style="width:70px;">
+            <button onclick="updateScore('${email}', '${safeId}')" class="action-btn" style="width:auto; padding: 8px;">Lưu điểm</button>
           </div>
         `;
         list.appendChild(div);
@@ -549,7 +579,8 @@
     }
 
     function updateScore(email, qId) {
-      const newScore = document.getElementById(`score_${qId}`).value;
+      const safeId = escapeHtml(qId);
+      const newScore = document.getElementById(`score_${safeId}`).value;
       google.script.run.withSuccessHandler(() => {
         alert("Đã cập nhật điểm! Vui lòng tra cứu lại để xem tổng điểm mới.");
       }).updateParagraphScore(email, qId, newScore);
@@ -563,15 +594,39 @@
         const tbody = document.getElementById('candidatesTbody');
         tbody.innerHTML = "";
         list.forEach(c => {
-          let tr = `<tr>
-            <td style="text-align:center;"><input type="checkbox" class="cand-chk" value="${c.email}"></td>
-            <td>${new Date(c.timestamp).toLocaleString()}</td>
-            <td>${c.fullName}</td>
-            <td>${c.email}</td>
-            <td>${c.position}</td>
-            <td>${c.totalScore}</td>
-          </tr>`;
-          tbody.innerHTML += tr;
+          let tr = document.createElement('tr');
+
+          let tdChk = document.createElement('td');
+          tdChk.style.textAlign = "center";
+          let chk = document.createElement('input');
+          chk.type = "checkbox";
+          chk.className = "cand-chk";
+          chk.value = c.email;
+          tdChk.appendChild(chk);
+
+          let tdTime = document.createElement('td');
+          tdTime.textContent = new Date(c.timestamp).toLocaleString();
+
+          let tdName = document.createElement('td');
+          tdName.textContent = c.fullName;
+
+          let tdEmail = document.createElement('td');
+          tdEmail.textContent = c.email;
+
+          let tdPos = document.createElement('td');
+          tdPos.textContent = c.position;
+
+          let tdScore = document.createElement('td');
+          tdScore.textContent = c.totalScore;
+
+          tr.appendChild(tdChk);
+          tr.appendChild(tdTime);
+          tr.appendChild(tdName);
+          tr.appendChild(tdEmail);
+          tr.appendChild(tdPos);
+          tr.appendChild(tdScore);
+
+          tbody.appendChild(tr);
         });
         document.getElementById('candidatesListContainer').style.display = 'block';
       }).getCandidatesList();

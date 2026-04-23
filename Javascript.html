@@ -82,6 +82,10 @@
     }
   }
 
+  function escapeHtml(unsafe) {
+    return (unsafe || "").toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  }
+
   function renderTest() {
     const cont = document.getElementById('questions-container');
     const paletteGrid = document.getElementById('palette-grid');
@@ -99,7 +103,7 @@
         currentGroupDiv = document.createElement('div');
         currentGroupDiv.className = "page-group fade-in-up";
         currentGroupDiv.id = "page-" + pages.length;
-        currentGroupDiv.innerHTML = `<h3 class="section-title">Phần: ${currentCategory}</h3>`;
+        currentGroupDiv.innerHTML = `<h3 class="section-title">Phần: ${escapeHtml(currentCategory)}</h3>`;
         cont.appendChild(currentGroupDiv);
         pages.push(currentGroupDiv);
       }
@@ -107,7 +111,7 @@
       // Palette Box
       const pBox = document.createElement('div');
       pBox.className = "palette-box";
-      pBox.id = "pbox-" + q.id;
+      pBox.id = "pbox-" + escapeHtml(q.id);
       pBox.innerText = (i + 1);
       pBox.onclick = () => jumpToQuestion(q.id, pages.indexOf(currentGroupDiv));
       paletteGrid.appendChild(pBox);
@@ -116,24 +120,24 @@
       const requiredMarker = (q.required === true || q.required === "TRUE" || q.required === "true") ? `<span style="color:red;">*</span>` : "";
       let block = document.createElement('div');
       block.className = "question-block";
-      block.id = "qblock-" + q.id;
+      block.id = "qblock-" + escapeHtml(q.id);
       block.dataset.id = q.id; block.dataset.type = q.type; block.dataset.text = q.question; block.dataset.required = q.required;
 
-      let h = `<b>Câu ${i+1}: ${q.question}</b> ${requiredMarker}
-               <label class="flag-label"><input type="checkbox" onchange="toggleFlag('${q.id}', this.checked)"> Cắm cờ xem lại</label><br>`;
+      let h = `<b>Câu ${i+1}: ${escapeHtml(q.question)}</b> ${requiredMarker}
+               <label class="flag-label"><input type="checkbox" onchange="toggleFlag('${escapeHtml(q.id)}', this.checked)"> Cắm cờ xem lại</label><br>`;
 
-      if (q.desc) h += `<p class="question-desc">${q.desc}</p>`;
-      if (q.image) h += `<img src="${q.image}" class="question-image" style="max-width:100%;"><br>`;
+      if (q.desc) h += `<p class="question-desc">${escapeHtml(q.desc)}</p>`;
+      if (q.image) h += `<img src="${encodeURI(q.image)}" class="question-image" style="max-width:100%;"><br>`;
 
       if(q.type === 'MULTIPLE_CHOICE' || q.type === 'SCALE') {
-        q.options.forEach(o => h += `<label class="option-label"><input type="radio" name="q${i}" value="${o}" onchange="markAnswered('${q.id}')"> ${o}</label>`);
+        q.options.forEach(o => h += `<label class="option-label"><input type="radio" name="q${i}" value="${escapeHtml(o)}" onchange="markAnswered('${escapeHtml(q.id)}')"> ${escapeHtml(o)}</label>`);
       } else if(q.type === 'CHECKBOX') {
-        q.options.forEach(o => h += `<label class="option-label"><input type="checkbox" name="q${i}" value="${o}" onchange="markAnswered('${q.id}')"> ${o}</label>`);
+        q.options.forEach(o => h += `<label class="option-label"><input type="checkbox" name="q${i}" value="${escapeHtml(o)}" onchange="markAnswered('${escapeHtml(q.id)}')"> ${escapeHtml(o)}</label>`);
       } else if(q.type === 'PARAGRAPH') {
-        h += `<textarea name="q${i}" rows="4" oninput="markAnswered('${q.id}')"></textarea>`;
+        h += `<textarea name="q${i}" rows="4" oninput="markAnswered('${escapeHtml(q.id)}')"></textarea>`;
       } else if(q.type === 'DROPDOWN') {
-        h += `<select name="q${i}" onchange="markAnswered('${q.id}')"><option value="">-- Chọn --</option>`;
-        q.options.forEach(o => h += `<option value="${o}">${o}</option>`);
+        h += `<select name="q${i}" onchange="markAnswered('${escapeHtml(q.id)}')"><option value="">-- Chọn --</option>`;
+        q.options.forEach(o => h += `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`);
         h += `</select>`;
       }
       block.innerHTML = h;
