@@ -44,7 +44,8 @@ function getWebAppUrl() {
   return ScriptApp.getService().getUrl();
 }
 
-function assignQuestionsToCandidate(type, value, idsString) {
+function assignQuestionsToCandidate(type, value, idsString, passcode) {
+  if (!verifyAdminPasscode(passcode)) throw new Error("Unauthorized");
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('ASSIGNMENTS');
   if (!sheet) return "Lỗi: Không tìm thấy sheet ASSIGNMENTS.";
@@ -64,7 +65,18 @@ function assignQuestionsToCandidate(type, value, idsString) {
   return "Đã thêm chỉ định câu hỏi thành công!";
 }
 
-function getSystemSettings() {
+function verifyAdminPasscode(passcode) {
+  if (!passcode) return false;
+  const settings = getSystemSettingsInternal();
+  // Allow if no passcode is configured, or if it matches
+  const validPasscode = settings['Admin_Passcode'];
+  if (!validPasscode || validPasscode.toString().trim() === '') {
+    return true; // Unlocked if not set
+  }
+  return String(passcode).trim() === String(validPasscode).trim();
+}
+
+function getSystemSettingsInternal() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('SYSTEM_SETTINGS');
   if (!sheet) return {};
@@ -76,7 +88,34 @@ function getSystemSettings() {
   return settings;
 }
 
-function saveSystemSettings(settingsObj) {
+function getSystemSettings(passcode) {
+  const settings = getSystemSettingsInternal();
+  // If not admin, hide the passcode and internal settings
+  if (!verifyAdminPasscode(passcode)) {
+    return {
+      'Logo_URL': settings['Logo_URL'],
+      'Anti_Cheat_Enabled': settings['Anti_Cheat_Enabled'],
+      'Anti_Cheat_Max_Violations': settings['Anti_Cheat_Max_Violations']
+    };
+  }
+  return settings;
+}
+
+// Dummy to avoid breaking old calls if any, though everything should now pass a passcode
+function getSystemSettings_OLD_UNUSED() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('SYSTEM_SETTINGS');
+  if (!sheet) return {};
+  const data = sheet.getDataRange().getValues();
+  let settings = {};
+  for(let i=1; i<data.length; i++){
+    settings[data[i][0]] = data[i][1];
+  }
+  return settings;
+}
+
+function saveSystemSettings(settingsObj, passcode) {
+  if (!verifyAdminPasscode(passcode)) throw new Error("Unauthorized");
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('SYSTEM_SETTINGS');
   if (!sheet) return "Lỗi: Không tìm thấy SYSTEM_SETTINGS";
@@ -98,7 +137,8 @@ function saveSystemSettings(settingsObj) {
   return "Lưu cài đặt thành công!";
 }
 
-function getDashboardStats() {
+function getDashboardStats(passcode) {
+  if (!verifyAdminPasscode(passcode)) throw new Error("Unauthorized");
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const resSheet = ss.getSheetByName('RESULTS');
   if(!resSheet) return { total: 0, avgScore: 0, positionCounts: {} };
@@ -128,7 +168,8 @@ function getDashboardStats() {
   };
 }
 
-function getCandidatesList() {
+function getCandidatesList(passcode) {
+  if (!verifyAdminPasscode(passcode)) throw new Error("Unauthorized");
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const resSheet = ss.getSheetByName('RESULTS');
@@ -158,7 +199,8 @@ function getCandidatesList() {
   }
 }
 
-function getBulkReports(emails) {
+function getBulkReports(emails, passcode) {
+  if (!verifyAdminPasscode(passcode)) throw new Error("Unauthorized");
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const qbData = ss.getSheetByName('QUESTIONBANK').getDataRange().getValues();
   const ansData = ss.getSheetByName('ANSWERS').getDataRange().getValues();
@@ -204,7 +246,8 @@ function getBulkReports(emails) {
   return reports;
 }
 
-function getCandidateReport(email) {
+function getCandidateReport(email, passcode) {
+  if (!verifyAdminPasscode(passcode)) throw new Error("Unauthorized");
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const qbData = ss.getSheetByName('QUESTIONBANK').getDataRange().getValues();
   const ansData = ss.getSheetByName('ANSWERS').getDataRange().getValues();
@@ -258,7 +301,8 @@ function getCandidateReport(email) {
   };
 }
 
-function updateParagraphScore(email, qId, newScore) {
+function updateParagraphScore(email, qId, newScore, passcode) {
+  if (!verifyAdminPasscode(passcode)) throw new Error("Unauthorized");
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const ansSheet = ss.getSheetByName('ANSWERS');
   const resSheet = ss.getSheetByName('RESULTS');
@@ -288,7 +332,8 @@ function updateParagraphScore(email, qId, newScore) {
   return true;
 }
 
-function getConfigData() {
+function getConfigData(passcode) {
+  if (!verifyAdminPasscode(passcode)) throw new Error("Unauthorized");
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let configSheet = ss.getSheetByName('CONFIG');
   if (!configSheet) return { headers: [], data: [] };
@@ -349,7 +394,8 @@ function getConfigData() {
   };
 }
 
-function updateConfigData(configArray) {
+function updateConfigData(configArray, passcode) {
+  if (!verifyAdminPasscode(passcode)) throw new Error("Unauthorized");
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let configSheet = ss.getSheetByName('CONFIG');
   if (!configSheet) return "Lỗi: Không tìm thấy sheet CONFIG.";
@@ -361,7 +407,8 @@ function updateConfigData(configArray) {
   return "Cập nhật Configs thành công!";
 }
 
-function generateExportData(email) {
+function generateExportData(email, passcode) {
+  if (!verifyAdminPasscode(passcode)) throw new Error("Unauthorized");
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const qbData = ss.getSheetByName('QUESTIONBANK').getDataRange().getValues();
   const ansData = ss.getSheetByName('ANSWERS').getDataRange().getValues();
@@ -479,6 +526,7 @@ function initSystem() {
     setSheet.appendRow(['Anti_Cheat_Enabled', 'TRUE']);
     setSheet.appendRow(['Anti_Cheat_Max_Violations', '3']);
     setSheet.appendRow(['HR_Notification_Email', '']);
+    setSheet.appendRow(['Admin_Passcode', 'admin123']);
   }
   
   return "Hệ thống đã khởi tạo thành công!";

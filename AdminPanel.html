@@ -33,12 +33,30 @@
     .config-col h4 { margin-top: 0; border-bottom: 1px solid #ddd; padding-bottom: 5px; color: #e67e22; }
     .config-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
     .config-item input { width: 60px; margin: 0; }
+
+    /* Login Overlay */
+    #adminLoginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; justify-content: center; align-items: center; }
+    .login-box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); text-align: center; width: 350px; }
+    .login-box h3 { margin-top: 0; color: #2c3e50; }
+    .login-box input { width: 100%; padding: 12px; margin: 15px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    .login-box button { background: #3498db; color: white; padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; width: 100%; }
+    .login-box button:hover { background: #2980b9; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- jsPDF for exporting -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
+
+  <div id="adminLoginOverlay">
+    <div class="login-box">
+      <h3>Xác thực Quản trị</h3>
+      <p style="color:#555; font-size:13px;">Vui lòng nhập mã truy cập Admin.</p>
+      <input type="password" id="adminPasscode" placeholder="Mã truy cập...">
+      <button onclick="verifyLogin()">Đăng Nhập</button>
+      <div id="loginError" style="color: red; margin-top: 10px; display: none;">Mã truy cập không đúng!</div>
+    </div>
+  </div>
 
   <div class="sidebar">
     <h2>Admin Panel</h2>
@@ -86,7 +104,11 @@
       </div>
 
       <div class="card">
-        <h3>Cài đặt Giao diện & Chống gian lận</h3>
+        <h3>Cài đặt Hệ thống & Chống gian lận</h3>
+        <label>Mã truy cập Admin (Admin Passcode):</label>
+        <input type="text" id="setPasscode" placeholder="admin123">
+        <p style="font-size:12px; color:#e74c3c; margin-top:-10px;">Lưu ý: Nếu để trống, ai cũng có thể vào trang Admin.</p>
+
         <label>URL Logo Công ty (để trống nếu không dùng):</label>
         <input type="text" id="setLogo" placeholder="https://example.com/logo.png">
 
@@ -239,8 +261,22 @@
 
   <script>
     // --- UTILS & NAVIGATION ---
+    let CURRENT_PASSCODE = "";
     let currentConfigData = { headers: [], data: [] };
     let myRadarChart = null;
+
+    function verifyLogin() {
+      const p = document.getElementById('adminPasscode').value;
+      google.script.run.withSuccessHandler(isValid => {
+        if (isValid) {
+          CURRENT_PASSCODE = p;
+          document.getElementById('adminLoginOverlay').style.display = 'none';
+          loadDashboard();
+        } else {
+          document.getElementById('loginError').style.display = 'block';
+        }
+      }).verifyAdminPasscode(p);
+    }
 
     function openTab(evt, tabName) {
       const tabcontent = document.getElementsByClassName("tabcontent");
@@ -265,15 +301,17 @@
 
     function loadSettings() {
       google.script.run.withSuccessHandler(settings => {
+        document.getElementById('setPasscode').value = settings['Admin_Passcode'] || '';
         document.getElementById('setLogo').value = settings['Logo_URL'] || '';
         document.getElementById('setAntiCheat').value = settings['Anti_Cheat_Enabled'] || 'TRUE';
         document.getElementById('setAntiCheatMax').value = settings['Anti_Cheat_Max_Violations'] || '3';
         document.getElementById('setHrEmail').value = settings['HR_Notification_Email'] || '';
-      }).getSystemSettings();
+      }).getSystemSettings(CURRENT_PASSCODE);
     }
 
     function saveSettings() {
       const obj = {
+        'Admin_Passcode': document.getElementById('setPasscode').value.trim(),
         'Logo_URL': document.getElementById('setLogo').value.trim(),
         'Anti_Cheat_Enabled': document.getElementById('setAntiCheat').value,
         'Anti_Cheat_Max_Violations': document.getElementById('setAntiCheatMax').value,
@@ -282,8 +320,12 @@
       document.getElementById('loadingSettings').style.display = 'block';
       google.script.run.withSuccessHandler(msg => {
         document.getElementById('loadingSettings').style.display = 'none';
+        CURRENT_PASSCODE = obj['Admin_Passcode']; // Update current session passcode
         alert(msg);
-      }).saveSystemSettings(obj);
+      }).withFailureHandler(err => {
+        document.getElementById('loadingSettings').style.display = 'none';
+        alert(err.message);
+      }).saveSystemSettings(obj, CURRENT_PASSCODE);
     }
 
     // --- CONFIGS TAB (VERTICAL LAYOUT) ---
@@ -302,7 +344,10 @@
           sel.appendChild(opt);
         });
         if (res.data.length > 0) loadPositionConfig();
-      }).getConfigData();
+      }).withFailureHandler(err => {
+        document.getElementById('loadingConfig').style.display = 'none';
+        alert(err.message);
+      }).getConfigData(CURRENT_PASSCODE);
     }
 
     function loadPositionConfig() {
@@ -387,7 +432,10 @@
       google.script.run.withSuccessHandler(msg => {
         document.getElementById('loadingConfig').style.display = 'none';
         alert(msg);
-      }).updateConfigData(payload);
+      }).withFailureHandler(err => {
+        document.getElementById('loadingConfig').style.display = 'none';
+        alert(err.message);
+      }).updateConfigData(payload, CURRENT_PASSCODE);
     }
 
     // --- ASSIGNMENTS TAB ---
@@ -401,7 +449,10 @@
       google.script.run.withSuccessHandler(msg => {
         document.getElementById('loadingAssign').style.display = 'none';
         alert(msg);
-      }).assignQuestionsToCandidate(type, val, ids);
+      }).withFailureHandler(err => {
+        document.getElementById('loadingAssign').style.display = 'none';
+        alert(err.message);
+      }).assignQuestionsToCandidate(type, val, ids, CURRENT_PASSCODE);
     }
 
     // --- REPORT TAB ---
@@ -420,7 +471,7 @@
       }).withFailureHandler(err => {
         document.getElementById('loadingReportList').style.display = 'none';
         alert('Lỗi tải danh sách: ' + err.message);
-      }).getCandidatesList();
+      }).getCandidatesList(CURRENT_PASSCODE);
     }
 
     document.getElementById('reportSearch').addEventListener('input', renderReportCandidatesTable);
@@ -502,7 +553,10 @@
 
         // Scroll down to report
         document.getElementById('reportContainer').scrollIntoView({ behavior: 'smooth' });
-      }).getCandidateReport(email);
+      }).withFailureHandler(err => {
+        document.getElementById('loadingReport').style.display = 'none';
+        alert(err.message);
+      }).getCandidateReport(email, CURRENT_PASSCODE);
     }
 
     function downloadTxtReport() {
@@ -520,7 +574,10 @@
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-      }).generateExportData(currentReportEmail);
+      }).withFailureHandler(err => {
+        document.getElementById('loadingReport').style.display = 'none';
+        alert(err.message);
+      }).generateExportData(currentReportEmail, CURRENT_PASSCODE);
     }
 
     function renderChart(scores, canvasId) {
@@ -583,7 +640,9 @@
       const newScore = document.getElementById(`score_${safeId}`).value;
       google.script.run.withSuccessHandler(() => {
         alert("Đã cập nhật điểm! Vui lòng tra cứu lại để xem tổng điểm mới.");
-      }).updateParagraphScore(email, qId, newScore);
+      }).withFailureHandler(err => {
+        alert(err.message);
+      }).updateParagraphScore(email, qId, newScore, CURRENT_PASSCODE);
     }
 
     // --- BULK EXPORT TAB ---
@@ -629,7 +688,10 @@
           tbody.appendChild(tr);
         });
         document.getElementById('candidatesListContainer').style.display = 'block';
-      }).getCandidatesList();
+      }).withFailureHandler(err => {
+        document.getElementById('loadingCandidates').style.display = 'none';
+        alert(err.message);
+      }).getCandidatesList(CURRENT_PASSCODE);
     }
 
     function toggleAll(source) {
@@ -644,7 +706,10 @@
       document.getElementById('loadingExport').style.display = 'block';
       google.script.run.withSuccessHandler(reports => {
         generatePDF(reports);
-      }).getBulkReports(checked);
+      }).withFailureHandler(err => {
+        document.getElementById('loadingExport').style.display = 'none';
+        alert(err.message);
+      }).getBulkReports(checked, CURRENT_PASSCODE);
     }
 
     function generatePDF(reports) {
@@ -715,7 +780,10 @@
             scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
           }
         });
-      }).getDashboardStats();
+      }).withFailureHandler(err => {
+        document.getElementById('loadingDash').style.display = 'none';
+        alert(err.message);
+      }).getDashboardStats(CURRENT_PASSCODE);
     }
 
     // Wrap tab logic
@@ -727,14 +795,16 @@
 
     // Init load on start
     window.onload = () => {
-      loadDashboard();
-      // Pre-load settings silently
-      google.script.run.withSuccessHandler(settings => {
-        document.getElementById('setLogo').value = settings['Logo_URL'] || '';
-        document.getElementById('setAntiCheat').value = settings['Anti_Cheat_Enabled'] || 'TRUE';
-        document.getElementById('setAntiCheatMax').value = settings['Anti_Cheat_Max_Violations'] || '3';
-        document.getElementById('setHrEmail').value = settings['HR_Notification_Email'] || '';
-      }).getSystemSettings();
+      // Check if passcode is actually required
+      google.script.run.withSuccessHandler(isValid => {
+        if (isValid) {
+          // Empty passcode is valid -> no passcode configured
+          document.getElementById('adminLoginOverlay').style.display = 'none';
+          loadDashboard();
+        } else {
+          // Keep overlay active
+        }
+      }).verifyAdminPasscode("");
     };
   </script>
 </body>
