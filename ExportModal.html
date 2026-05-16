@@ -16,7 +16,11 @@
   <input type="email" id="emailInput" placeholder="VD: ungvien@example.com">
   <button onclick="fetchData()">Lấy dữ liệu</button>
   <span id="loading"> Đang lấy dữ liệu...</span>
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> fix/dynamic-categories-and-checkboxes-2968916427855273903
   <br>
   <textarea id="resultTextarea" placeholder="Kết quả sẽ hiển thị ở đây để bạn Copy đưa vào AI..." readonly></textarea>
   <button onclick="copyData()" style="margin-top: 10px; background: #2ecc71;">Copy Kết Quả</button>
@@ -28,16 +32,27 @@
         alert("Vui lòng nhập email.");
         return;
       }
+<<<<<<< HEAD
 
       document.getElementById('loading').style.display = 'inline';
       document.getElementById('resultTextarea').value = "";
 
+=======
+
+      document.getElementById('loading').style.display = 'inline';
+      document.getElementById('resultTextarea').value = "";
+
+>>>>>>> fix/dynamic-categories-and-checkboxes-2968916427855273903
       google.script.run.withSuccessHandler(function(res) {
         document.getElementById('loading').style.display = 'none';
         document.getElementById('resultTextarea').value = res;
       }).generateExportData(email);
     }
+<<<<<<< HEAD
 
+=======
+
+>>>>>>> fix/dynamic-categories-and-checkboxes-2968916427855273903
     function copyData() {
       const txt = document.getElementById('resultTextarea');
       txt.select();

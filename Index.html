@@ -6,8 +6,11 @@
 </head>
 <body>
   <div class="container">
+    <img id="company-logo" class="company-logo" style="display:none;" />
+
     <div id="registration-screen">
-      <h2>Hệ thống Test Tuyển dụng</h2>
+      <h2 style="text-align: center;">Hệ thống Test Tuyển dụng</h2>
+      <p id="resume-msg" style="color: #e67e22; font-weight: bold; text-align: center; display: none;">Bạn có một bài test đang làm dở. Hệ thống sẽ tự động khôi phục.</p>
       <form id="reg-form">
         <input type="text" id="fullName" placeholder="Họ và Tên" required><br><br>
         <input type="email" id="email" placeholder="Email" required><br><br>
@@ -18,8 +21,19 @@
     </div>
     <div id="test-screen" style="display:none">
       <div id="timer-container">Thời gian: <span id="timer"></span></div>
+
+      <div id="palette-container">
+        <h4 style="margin:0 0 5px 0;">Bảng điều hướng</h4>
+        <div id="palette-grid" class="palette-grid"></div>
+      </div>
+
       <div id="questions-container"></div>
-      <button id="finish-btn">Nộp bài</button>
+
+      <div class="nav-buttons" id="nav-buttons">
+        <button id="prev-btn" class="nav-btn" style="display:none;" onclick="prevPage()">Quay lại</button>
+        <button id="next-btn" class="nav-btn primary" onclick="nextPage()">Tiếp tục</button>
+        <button id="finish-btn" class="nav-btn primary" style="display:none;">Nộp bài</button>
+      </div>
     </div>
     <div id="result-screen" style="display:none"><h2 id="result-msg"></h2></div>
     <div id="loading" style="display:none">Đang xử lý...</div>
